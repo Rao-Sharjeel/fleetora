@@ -26,6 +26,11 @@ READ_HEAVY = allow_roles("admin", "fleet_manager", "management")
 OPERATIONAL_WRITE = allow_roles("admin", "fleet_manager")
 ADMIN_ONLY = allow_roles("admin")
 KIOSK_OR_GATE_STAFF = allow_kiosk_or_roles("admin", "fleet_manager", "gate_guard")
+# Driver/Guard list & retrieve specifically (not Vehicle/Trip/FuelEntry, which stay
+# READ_HEAVY-only — trip history and fuel cost are more sensitive than a name/ID
+# picklist): the Gate-Out screen's manual-select fallback needs a gate_guard to be
+# able to list drivers/guards, not just look one up by a scanned code.
+READ_HEAVY_OR_GATE_STAFF = allow_roles("admin", "fleet_manager", "management", "gate_guard")
 
 
 class VehicleViewSet(viewsets.ModelViewSet):
@@ -37,7 +42,9 @@ class VehicleViewSet(viewsets.ModelViewSet):
         if self.action in ("by_code", "gate_in"):
             return [KIOSK_OR_GATE_STAFF()]
         if self.action in ("list", "retrieve"):
-            return [READ_HEAVY()]
+            # A gate_guard needs this for the "Currently Out" gate tile
+            # (vehicles-outside-page.tsx), not just by-code lookup.
+            return [READ_HEAVY_OR_GATE_STAFF()]
         return [OPERATIONAL_WRITE()]
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
@@ -111,7 +118,7 @@ class DriverViewSet(viewsets.ModelViewSet):
         if self.action == "by_code":
             return [KIOSK_OR_GATE_STAFF()]
         if self.action in ("list", "retrieve"):
-            return [READ_HEAVY()]
+            return [READ_HEAVY_OR_GATE_STAFF()]
         return [OPERATIONAL_WRITE()]
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
@@ -130,6 +137,8 @@ class GuardViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "by_code":
             return [KIOSK_OR_GATE_STAFF()]
+        if self.action in ("list", "retrieve"):
+            return [READ_HEAVY_OR_GATE_STAFF()]
         return [ADMIN_ONLY()]
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
@@ -150,7 +159,9 @@ class TripViewSet(viewsets.ModelViewSet):
         if self.action == "gate_out":
             return [KIOSK_OR_GATE_STAFF()]
         if self.action in ("list", "retrieve"):
-            return [READ_HEAVY()]
+            # A gate_guard needs this to find a vehicle's open trip at Gate-In
+            # (trips.service.ts getOpenTripForVehicle) — not just create one.
+            return [READ_HEAVY_OR_GATE_STAFF()]
         return [OPERATIONAL_WRITE()]
 
     @action(detail=False, methods=["post"], url_path="gate-out")
