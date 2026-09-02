@@ -1,0 +1,362 @@
+/*
+ * Fleetora sign-in. Deliberately outside the console's brass/steel theme: this is
+ * the depot door, not the instrument panel behind it. Palette is pulled from the
+ * fleet photo (ink, headlight azure) plus the one warm accent that already exists
+ * inside the logo itself — the orange gauge needle in the "O" — used only for focus.
+ */
+.fx-login {
+  --ink: #05090f;
+  --ink-2: #0b1119;
+  --hair: #1c2534;
+  --text: #e6ecf5;
+  --muted: #8a97ac;
+  --beam: #35a8e8;
+  --beam-deep: #1668c4;
+  --ember: #f2a33c;
+
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--text);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* ---------- backdrop ---------- */
+
+.fx-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 28% bottom;
+  /* Grown from the bottom-left corner: the fleet drifts right into the centre of the
+     visible area while the left edge and the ground line both stay pinned. */
+  transform: scale(1.1);
+  transform-origin: left bottom;
+}
+
+/* Darkens the sky for the wordmark and fades toward the vehicles, which stay untinted. */
+.fx-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(5, 9, 15, 0.86) 0%, rgba(5, 9, 15, 0.38) 34%, rgba(5, 9, 15, 0) 62%),
+    linear-gradient(90deg, rgba(5, 9, 15, 0.28) 0%, rgba(5, 9, 15, 0) 32%);
+}
+
+/* On narrow screens the panel covers everything, so the photo only reads as texture. */
+.fx-scrim-mobile {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 9, 15, 0.45);
+}
+
+/* ---------- brand, over the photo ---------- */
+
+/* Sits in the photo column and centres on it, high enough to clear the fleet. */
+.fx-brand {
+  display: none;
+  grid-column: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: clamp(3rem, 11vh, 6.5rem) 2rem 0;
+  z-index: 2;
+  text-align: center;
+}
+
+.fx-wordmark {
+  display: block;
+  width: clamp(15rem, 22vw, 19rem);
+  height: auto;
+}
+
+.fx-brand-sub {
+  margin: 0.85rem 0 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: rgba(230, 236, 245, 0.72);
+}
+
+.fx-powered {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 1.4rem 0 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(230, 236, 245, 0.62);
+}
+
+.fx-colophon {
+  display: none;
+  position: absolute;
+  bottom: clamp(1.5rem, 4vh, 2.5rem);
+  left: clamp(2rem, 5vw, 4rem);
+  z-index: 2;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(230, 236, 245, 0.5);
+}
+
+.fx-sigma {
+  width: 1.15rem;
+  height: 1.15rem;
+  object-fit: contain;
+}
+
+/* ---------- panel ---------- */
+
+.fx-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: clamp(1.5rem, 5vw, 3rem) clamp(1.5rem, 5vw, 3.25rem);
+  background: rgba(5, 9, 15, 0.68);
+  backdrop-filter: blur(22px);
+}
+
+.fx-panel-inner {
+  width: 100%;
+  max-width: 22rem;
+}
+
+/* Every direct child rises in on load, one after the next. */
+@media (prefers-reduced-motion: no-preference) {
+  .fx-panel-inner > * {
+    animation: fx-rise 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+  .fx-panel-inner > *:nth-child(1) { animation-delay: 0.04s; }
+  .fx-panel-inner > *:nth-child(2) { animation-delay: 0.1s; }
+  .fx-panel-inner > *:nth-child(3) { animation-delay: 0.16s; }
+  .fx-panel-inner > *:nth-child(4) { animation-delay: 0.22s; }
+  .fx-panel-inner > *:nth-child(5) { animation-delay: 0.28s; }
+  .fx-panel-inner > *:nth-child(6) { animation-delay: 0.34s; }
+}
+
+@keyframes fx-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The readout: real browser time, in tabular figures so it never jitters. */
+.fx-clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--hair);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fx-clock-time {
+  font-size: 0.8125rem;
+  color: rgba(230, 236, 245, 0.9);
+}
+
+.fx-panel-brand {
+  margin-bottom: 2rem;
+}
+
+.fx-panel-wordmark {
+  display: block;
+  width: 11rem;
+  height: auto;
+}
+
+.fx-eyebrow {
+  margin: 2.25rem 0 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--beam);
+}
+
+.fx-title {
+  margin: 0.6rem 0 2rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* ---------- form ---------- */
+
+.fx-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.fx-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.fx-well {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fx-input {
+  width: 100%;
+  height: 3rem;
+  padding: 0 1rem;
+  border: 1px solid var(--hair);
+  border-radius: 0.625rem;
+  background: var(--ink-2);
+  color: var(--text);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.fx-input::placeholder { color: rgba(138, 151, 172, 0.6); }
+
+.fx-input:hover { border-color: #263349; }
+
+.fx-input:focus {
+  outline: none;
+  border-color: var(--beam);
+  background: #0d141e;
+}
+
+.fx-input--password { padding-right: 3rem; }
+
+.fx-peek {
+  position: absolute;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+
+.fx-peek:hover { color: var(--text); }
+
+.fx-forgot {
+  align-self: flex-end;
+  margin-top: -0.35rem;
+  border: 0;
+  background: none;
+  padding: 0.15rem 0;
+  color: var(--beam);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.fx-forgot:hover { text-decoration: underline; }
+
+.fx-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  height: 3.125rem;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.625rem;
+  background: linear-gradient(180deg, var(--beam) 0%, var(--beam-deep) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 26px -12px rgba(53, 168, 232, 0.85);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: filter 0.16s ease, transform 0.16s ease;
+}
+
+.fx-submit:hover:not(:disabled) { filter: brightness(1.08); }
+.fx-submit:active:not(:disabled) { transform: translateY(1px); }
+.fx-submit:disabled { opacity: 0.65; cursor: progress; }
+
+.fx-submit svg { transition: transform 0.18s ease; }
+.fx-submit:hover:not(:disabled) svg { transform: translateX(3px); }
+
+.fx-help {
+  margin: 2rem 0 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--hair);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.fx-help button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--beam);
+  font: inherit;
+  cursor: pointer;
+}
+
+.fx-help button:hover { text-decoration: underline; }
+
+/* The one warm accent in the design, spent on keyboard focus. */
+.fx-login :focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+  border-radius: 0.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-login * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- desktop ---------- */
+
+@media (min-width: 64rem) {
+  .fx-login { grid-template-columns: 1fr min(28rem, 40vw); }
+  .fx-brand { display: flex; }
+  .fx-colophon { display: block; }
+  .fx-scrim-mobile { display: none; }
+  .fx-panel-brand { display: none; }
+  .fx-panel {
+    grid-column: 2;
+    /* Light enough that the city reads faintly through it, dense enough to stay legible. */
+    background: rgba(5, 9, 15, 0.66);
+    border-left: 1px solid rgba(53, 168, 232, 0.16);
+    box-shadow: -30px 0 80px -40px rgba(53, 168, 232, 0.5);
+  }
+}

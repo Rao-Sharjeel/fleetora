@@ -1,0 +1,39 @@
+/*
+ * Shared kiosk theme. Each app imports this, then overrides --color-kiosk-accent
+ * in its own @theme block so Exit / Entry / Fuel are visually distinguishable
+ * (matching their separate home-screen icons) while staying one design system.
+ */
+@theme {
+  --color-kiosk-bg: #0a1222;
+  --color-kiosk-panel: #121c36;
+  --color-kiosk-panel-alt: #16213f;
+  --color-kiosk-border: #26314f;
+  --color-kiosk-accent: #f5821f;
+  --color-kiosk-blue: #2e7dff;
+  --color-kiosk-success: #22c55e;
+  --color-kiosk-danger: #ef4444;
+  --color-kiosk-text: #f5f7fb;
+  --color-kiosk-muted: #8b94ad;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-kiosk-bg);
+  color: var(--color-kiosk-text);
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}

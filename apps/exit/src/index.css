@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@fleetora/kiosk-core/styles.css";
+
+/* Tailwind v4 only scans files it's told about — without this the classes used
+   inside @fleetora/kiosk-core components get tree-shaken out of this build. */
+@source "../../../packages/kiosk-core/src";
+
+/* Exit is orange — matches its home-screen icon. */
+@theme {
+  --color-kiosk-accent: #f5821f;
+}

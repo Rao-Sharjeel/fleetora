@@ -1,0 +1,125 @@
+/*
+ * Theme: "default" — instrument-panel palette for a fleet operations console.
+ * Dark is the primary, fully-designed surface (a control room reads gauges
+ * against dark glass, not a printed report on cream paper); light is a
+ * secondary variant for daytime/outdoor use, built from the same tokens so
+ * nothing else in the app needs to change when it's selected.
+ *
+ * Everything else in this app is built from the semantic tokens beneath the
+ * raw palette. To ship a new look later, copy this file to
+ * themes/<name>.css with the same variable names and new values, then point
+ * ThemeProvider at it — no component code changes.
+ */
+
+:root {
+  /* Raw brand palette (H S% L%, no hsl() wrapper so alpha modifiers work) */
+  --ink-950: 222 24% 6%;
+  --ink-900: 220 20% 9%;
+  --ink-850: 220 18% 12%;
+  --brass: 38 58% 58%;
+  --brass-ink: 32 45% 14%;
+  --steel: 205 42% 46%;
+  --signal-cyan: 189 62% 52%;
+  --ember: 32 82% 55%;
+  --emerald: 152 42% 42%;
+  --crimson: 355 58% 52%;
+
+  --fleetora-blue: 208 100% 50%;
+  --fleetora-blue-foreground: 210 40% 98%;
+  --fleetora-blue-muted: 212 30% 93%;
+  --fleetora-blue-muted-foreground: 213 15% 40%;
+  --fleetora-blue-border: 212 25% 85%;
+  --fleetora-blue-input: 212 25% 85%;
+  --fleetora-blue-ring: 208 100% 50%;
+  --fleetora-blue-success: 152 48% 30%;
+  --fleetora-blue-success-foreground: 150 40% 97%;
+  --fleetora-blue-warning: 32 78% 40%;
+  --fleetora-blue-warning-foreground: 32 60% 97%;
+  --fleetora-blue-destructive: 355 62% 42%;
+  --fleetora-blue-destructive-foreground: 355 60% 97%;
+  --fleetora-blue-shadow-color: 213 25% 70%;
+
+  /* Semantic tokens — components reference these, never the raw palette */
+  --background: var(--ink-950);
+  --foreground: 210 24% 94%;
+
+  --card: var(--ink-900);
+  --card-foreground: 210 24% 94%;
+
+  --popover: var(--ink-850);
+  --popover-foreground: 210 24% 94%;
+
+  --primary: var(--fleetora-blue);
+  --primary-foreground: var(--fleetora-blue-foreground);
+
+  --secondary: var(--steel);
+  --secondary-foreground: 210 30% 97%;
+
+  --accent: var(--signal-cyan);
+  --accent-foreground: 200 60% 10%;
+
+  --muted: 220 16% 14%;
+  --muted-foreground: 217 12% 62%;
+
+  --border: 220 15% 18%;
+  --input: 220 15% 18%;
+  --ring: var(--fleetora-blue);
+
+  --success: var(--emerald);
+  --success-foreground: 150 40% 96%;
+  --warning: var(--ember);
+  --warning-foreground: 32 60% 12%;
+  --destructive: var(--crimson);
+  --destructive-foreground: 355 60% 97%;
+
+  /* Sidebar always reads as the darkest plane in the console, in both
+     themes, so wayfinding chrome never competes with page content. */
+  --sidebar: 224 26% 4%;
+  --sidebar-foreground: 210 18% 88%;
+  --sidebar-muted-foreground: 216 12% 56%;
+  --sidebar-accent: var(--fleetora-blue);
+  --sidebar-accent-foreground: var(--fleetora-ink);
+  --sidebar-border: 220 18% 12%;
+
+  --radius: 0.625rem;
+
+  --shadow-color: 222 40% 2%;
+}
+
+/* Light — same instrument, daylight glass. Cool graphite ink on soft paper,
+   not the cream/dust-and-garden-green combination this replaces. */
+[data-theme="light"] {
+  --background: 216 24% 96%;
+  --foreground: 222 32% 12%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 32% 12%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 32% 12%;
+
+  --primary: 36 62% 42%;
+  --primary-foreground: 40 45% 98%;
+
+  --secondary: 205 45% 34%;
+  --secondary-foreground: 210 30% 98%;
+
+  --accent: 191 62% 34%;
+  --accent-foreground: 190 45% 98%;
+
+  --muted: 216 18% 91%;
+  --muted-foreground: 220 12% 40%;
+
+  --border: 216 16% 85%;
+  --input: 216 16% 85%;
+  --ring: 36 62% 42%;
+
+  --success: 152 48% 30%;
+  --success-foreground: 150 40% 97%;
+  --warning: 32 78% 40%;
+  --warning-foreground: 32 60% 97%;
+  --destructive: 355 62% 42%;
+  --destructive-foreground: 355 60% 97%;
+
+  --shadow-color: 220 20% 70%;
+}

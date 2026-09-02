@@ -1,0 +1,25 @@
+{
+  "name": "fleetora",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=@fleetora/admin",
+    "dev:exit": "npm run dev --workspace=@fleetora/exit",
+    "dev:entry": "npm run dev --workspace=@fleetora/entry",
+    "dev:fuel": "npm run dev --workspace=@fleetora/fuel",
+    "build": "npm run build --workspaces --if-present",
+    "build:admin": "npm run build --workspace=@fleetora/admin",
+    "build:exit": "npm run build --workspace=@fleetora/exit",
+    "build:entry": "npm run build --workspace=@fleetora/entry",
+    "build:fuel": "npm run build --workspace=@fleetora/fuel",
+    "lint": "oxlint"
+  },
+  "devDependencies": {
+    "oxlint": "^1.75.0"
+  }
+}
