@@ -12,11 +12,13 @@
     "dev:exit": "npm run dev --workspace=@fleetora/exit",
     "dev:entry": "npm run dev --workspace=@fleetora/entry",
     "dev:fuel": "npm run dev --workspace=@fleetora/fuel",
+    "dev:platform": "npm run dev --workspace=@fleetora/platform",
     "build": "npm run build --workspaces --if-present",
     "build:admin": "npm run build --workspace=@fleetora/admin",
     "build:exit": "npm run build --workspace=@fleetora/exit",
     "build:entry": "npm run build --workspace=@fleetora/entry",
     "build:fuel": "npm run build --workspace=@fleetora/fuel",
+    "build:platform": "npm run build --workspace=@fleetora/platform",
     "lint": "oxlint"
   },
   "devDependencies": {
