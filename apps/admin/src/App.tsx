@@ -18,6 +18,7 @@ import { DocumentsPage } from "@/features/documents/pages/documents-page";
 import { AlertsPage } from "@/features/alerts/pages/alerts-page";
 import { ReportsPage } from "@/features/reports/pages/reports-page";
 import { UsersPage } from "@/features/users/pages/users-page";
+import { KioskDevicesPage } from "@/features/kiosk-devices/pages/kiosk-devices-page";
 import { AuditPage } from "@/features/audit/pages/audit-page";
 import { SettingsPage } from "@/features/settings/pages/settings-page";
 import { MasterSetupPage } from "@/features/master-data/pages/master-setup-page";
@@ -25,7 +26,6 @@ import { GateOutPage } from "@/features/gate-out/pages/gate-out-page";
 import { GateInPage } from "@/features/gate-in/pages/gate-in-page";
 import { DriverPortalPage } from "@/features/auth/driver-portal-page";
 import { LoginPage } from "@/features/auth/login-page";
-import { BridgePage } from "@/features/bridge/bridge-page";
 import { useSession } from "@/hooks/use-session";
 import { defaultRouteForRole } from "@/routes/nav-config";
 
@@ -175,6 +175,14 @@ export default function App() {
           }
         />
         <Route
+          path="/kiosk-devices"
+          element={
+            <RoleGuard allow={["admin"]}>
+              <KioskDevicesPage />
+            </RoleGuard>
+          }
+        />
+        <Route
           path="/audit"
           element={
             <RoleGuard allow={["admin"]}>
@@ -213,7 +221,6 @@ export default function App() {
         <Route path="/gate/fuel" element={<GateFuelEntryPage />} />
       </Route>
 
-      <Route path="/bridge" element={<BridgePage />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="*" element={<HomeRedirect />} />

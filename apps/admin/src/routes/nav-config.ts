@@ -19,6 +19,7 @@ import {
   Settings,
   Database,
   ShieldAlert,
+  Tablet,
 } from "lucide-react";
 import type { Role } from "@/types";
 
@@ -45,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Reports", path: "/reports", icon: BarChart3, roles: ["admin", "fleet_manager", "management"] },
   { label: "Master Setup", path: "/master-data", icon: Database, roles: ["admin"] },
   { label: "Users & Permissions", path: "/users", icon: ShieldCheck, roles: ["admin"] },
+  { label: "Kiosk Devices", path: "/kiosk-devices", icon: Tablet, roles: ["admin"] },
   { label: "Audit Trail", path: "/audit", icon: History, roles: ["admin"] },
   { label: "Administration", path: "/settings", icon: Settings, roles: ["admin"] },
 ];

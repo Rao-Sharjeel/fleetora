@@ -8,11 +8,14 @@ export { ScanIdCardScreen } from "./components/scan-id-card-screen";
 export { PersonIdentifiedScreen } from "./components/person-identified-screen";
 export { SplashScreen } from "./components/splash-screen";
 export { MobileOnlyGate } from "./components/mobile-only-gate";
+export { DeviceGate } from "./components/device-gate";
+export { PairingScreen } from "./components/pairing-screen";
 
 export { decodeQr } from "./lib/barcode";
 export { recognizePlateText, recognizeOdometerDigits } from "./lib/ocr";
 export { formatTimestamp } from "./lib/format";
 export { normalizePlate, platesMatch } from "./lib/normalize";
+export { ApiError } from "./lib/api-client";
 export {
   getVehicleByCode,
   getGuardByCode,
@@ -21,7 +24,9 @@ export {
   completeGateIn,
   createFuelEntry,
   createAlert,
-} from "./lib/bridge-client";
+} from "./lib/kiosk-api";
+
+export { useDeviceSession } from "./state/device-session";
 
 export type {
   Vehicle,
