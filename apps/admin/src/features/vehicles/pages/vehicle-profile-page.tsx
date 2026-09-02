@@ -28,10 +28,8 @@ import { useMaintenanceRecords } from "@/features/maintenance/hooks";
 import { useTyres } from "@/features/tyres/hooks";
 import { useDocuments } from "@/features/documents/hooks";
 import { useAuditLog } from "@/features/audit/hooks";
-import { useSession } from "@/hooks/use-session";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
-import { tyreMileage, tyreRemainingKm } from "@/services/tyres.service";
-import { documentAlertStatus } from "@/services/documents.service";
+import { useMasterCollection } from "@/features/master-data/hooks";
 
 export function VehicleProfilePage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
@@ -43,8 +41,8 @@ export function VehicleProfilePage() {
   const { data: tyres = [] } = useTyres();
   const { data: documents = [] } = useDocuments();
   const { data: auditLog = [] } = useAuditLog();
+  const { data: documentTypes = [] } = useMasterCollection("documentTypes");
 
-  const { userName } = useSession();
   const setAllowedToExit = useSetAllowedToExit();
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [allowedDraft, setAllowedDraft] = useState(true);
@@ -66,10 +64,8 @@ export function VehicleProfilePage() {
     }
     await setAllowedToExit.mutateAsync({
       vehicleId: vehicle.id,
-      registrationNumber: vehicle.registrationNumber,
       allowed: allowedDraft,
       reason: allowedDraft ? undefined : reasonDraft.trim(),
-      updatedBy: userName,
     });
     toast.success(allowedDraft ? "Vehicle is now allowed to exit." : "Vehicle exit has been blocked.");
     setExitDialogOpen(false);
@@ -177,16 +173,16 @@ export function VehicleProfilePage() {
             <InfoCard title="Company" value={vehicle.company} />
             <InfoCard title="Department" value={vehicle.departmentCostCentre ?? "—"} />
             <InfoCard title="Expected Fuel Average" value={`${vehicle.expectedFuelAverageKmpl} KM/L`} />
-            {vehicle.seatingCapacity !== undefined && (
+            {vehicle.seatingCapacity != null && (
               <InfoCard title="Seating Capacity" value={`${vehicle.seatingCapacity}`} />
             )}
             {vehicle.transmission && <InfoCard title="Transmission" value={vehicle.transmission} />}
             {vehicle.driveType && <InfoCard title="Drive Type" value={vehicle.driveType} />}
             {vehicle.bodyType && <InfoCard title="Body Type" value={vehicle.bodyType} />}
-            {vehicle.oilChangeKm !== undefined && (
+            {vehicle.oilChangeKm != null && (
               <InfoCard title="Oil Change Every" value={`${formatKm(vehicle.oilChangeKm)}`} />
             )}
-            {vehicle.tyreChangeKm !== undefined && (
+            {vehicle.tyreChangeKm != null && (
               <InfoCard title="Tyre Change Due After" value={`${formatKm(vehicle.tyreChangeKm)}`} />
             )}
           </div>
@@ -203,7 +199,7 @@ export function VehicleProfilePage() {
                   {t.tripNumber} · {t.purpose} → {t.destination}
                 </p>
                 <p className="text-muted-foreground">
-                  {formatDateTime(t.outTime)} {t.tripKm !== undefined && `· ${formatKm(t.tripKm)}`}
+                  {formatDateTime(t.outTime)} {t.tripKm != null && `· ${formatKm(t.tripKm)}`}
                 </p>
               </>
             )}
@@ -255,7 +251,7 @@ export function VehicleProfilePage() {
                   {t.tyreCode} · {t.brand} {t.size} · {t.wheelPosition}
                 </p>
                 <p className="text-muted-foreground">
-                  {formatKm(tyreMileage(t, vehicle.currentOdometer))} used · {formatKm(tyreRemainingKm(t, vehicle.currentOdometer))} remaining
+                  {formatKm(t.mileage ?? 0)} used · {formatKm(t.remainingKm ?? t.expectedLifeKm)} remaining
                 </p>
               </>
             )}
@@ -270,10 +266,10 @@ export function VehicleProfilePage() {
             render={(d) => (
               <div className="flex w-full items-center justify-between">
                 <div>
-                  <p className="font-medium">{d.documentType}</p>
+                  <p className="font-medium">{documentTypes.find((t) => t.id === d.documentTypeId)?.name ?? "—"}</p>
                   <p className="text-muted-foreground">Expires {formatDate(d.expiryDate)}</p>
                 </div>
-                <StatusBadge status={documentAlertStatus(d.expiryDate)} />
+                {d.documentAlertStatus && <StatusBadge status={d.documentAlertStatus} />}
               </div>
             )}
           />

@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useOpenTrips } from "@/features/trips/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
 import { useDrivers } from "@/features/drivers/hooks";
-import { tripDurationStatus, formatDuration } from "@/services/trips.service";
+import { formatDuration } from "@/services/trips.service";
 import { formatKm, formatTime } from "@/lib/formatters";
 
 export function VehiclesOutsidePage() {
@@ -38,7 +38,7 @@ export function VehiclesOutsidePage() {
                 <CardContent className="flex flex-col gap-2 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold">{vehicle?.registrationNumber ?? trip.vehicleId}</span>
-                    <StatusBadge status={tripDurationStatus(trip)} />
+                    <StatusBadge status={trip.tripDurationStatus ?? "normal"} />
                   </div>
                   <p className="text-sm text-muted-foreground">{driver?.name ?? trip.driverId}</p>
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">

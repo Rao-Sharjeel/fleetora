@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getSettings, updateMaintenanceThresholds } from "@/services/settings.service";
-import type { MaintenanceThresholds } from "@/services/mock/db";
+import { getSettings, updateMaintenanceThresholds, type MaintenanceThresholds } from "@/services/settings.service";
 
 export function useSettings() {
   return useQuery({ queryKey: ["settings"], queryFn: getSettings });

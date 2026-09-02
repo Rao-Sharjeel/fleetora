@@ -26,8 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useCreateDriver, useDrivers } from "@/features/drivers/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
+import { useMasterCollection } from "@/features/master-data/hooks";
 import { licenceStatus } from "@/services/drivers.service";
-import { DEPARTMENTS } from "@/services/mock/fixtures";
 import type { Driver } from "@/types";
 import { formatDate } from "@/lib/formatters";
 
@@ -99,6 +99,7 @@ const columns: ColumnDef<Driver>[] = [
 export function DriversListPage() {
   const { data: drivers = [], isLoading } = useDrivers();
   const { data: vehicles = [] } = useVehicles();
+  const { data: departments = [] } = useMasterCollection("departmentMasters");
   const createDriver = useCreateDriver();
   const [open, setOpen] = useState(false);
 
@@ -167,9 +168,9 @@ export function DriversListPage() {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {DEPARTMENTS.map((d) => (
-                          <SelectItem key={d} value={d}>
-                            {d}
+                        {departments.map((d) => (
+                          <SelectItem key={d.id} value={d.name}>
+                            {d.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

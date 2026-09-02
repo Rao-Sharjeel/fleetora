@@ -15,7 +15,7 @@ import { getDriverByCode, listDrivers } from "@/services/drivers.service";
 import { getGuardByCode } from "@/services/guards.service";
 import { useGuards } from "@/features/guards/hooks";
 import { useGateOut } from "@/features/trips/hooks";
-import { DEPARTMENTS, PURPOSES } from "@/services/mock/fixtures";
+import { useMasterCollection } from "@/features/master-data/hooks";
 import { formatKm } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { Driver, Vehicle } from "@/types";
@@ -37,6 +37,8 @@ export function GateOutPage() {
   const [confirmedTrip, setConfirmedTrip] = useState<string | null>(null);
 
   const { data: guards = [] } = useGuards();
+  const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
+  const { data: departments = [] } = useMasterCollection("departmentMasters");
   const gateOut = useGateOut();
 
   async function handleGuardScan(code: string) {
@@ -251,9 +253,9 @@ export function GateOutPage() {
                     <SelectValue placeholder="Select purpose" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PURPOSES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
+                    {purposes.map((p) => (
+                      <SelectItem key={p.id} value={p.name}>
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -274,9 +276,9 @@ export function GateOutPage() {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {d}
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.name}>
+                        {d.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createVehicle, getVehicle, listVehicles, setAllowedToExit, type CreateVehiclePayload } from "@/services/vehicles.service";
-import { createAuditLogEntry } from "@/services/audit.service";
 
 export function useVehicles() {
   return useQuery({ queryKey: ["vehicles"], queryFn: listVehicles });
@@ -24,26 +23,16 @@ export function useVehicle(id: string | undefined) {
 
 export interface SetAllowedToExitInput {
   vehicleId: string;
-  registrationNumber: string;
   allowed: boolean;
   reason?: string;
-  updatedBy: string;
 }
 
+/** The backend action itself writes the audit-log entry (stamped from the authenticated
+ * user) as part of the same transaction — no separate client-side audit write needed. */
 export function useSetAllowedToExit() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ vehicleId, registrationNumber, allowed, reason, updatedBy }: SetAllowedToExitInput) => {
-      const vehicle = await setAllowedToExit(vehicleId, allowed, reason, updatedBy);
-      await createAuditLogEntry({
-        user: updatedBy,
-        transaction: `Exit access changed — ${registrationNumber}`,
-        previousValue: allowed ? "Not Allowed to Exit" : "Allowed to Exit",
-        newValue: allowed ? "Allowed to Exit" : "Not Allowed to Exit",
-        reason,
-      });
-      return vehicle;
-    },
+    mutationFn: ({ vehicleId, allowed, reason }: SetAllowedToExitInput) => setAllowedToExit(vehicleId, allowed, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["audit"] });

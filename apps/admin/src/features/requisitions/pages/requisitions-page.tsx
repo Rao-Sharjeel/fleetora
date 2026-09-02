@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateRequisition, useRequisitions } from "@/features/requisitions/hooks";
-import { DEPARTMENTS, PURPOSES } from "@/services/mock/fixtures";
+import { useMasterCollection } from "@/features/master-data/hooks";
 import type { Requisition } from "@/types";
 import { formatDateTime } from "@/lib/formatters";
 
@@ -56,6 +56,8 @@ const columns: ColumnDef<Requisition>[] = [
 
 export function RequisitionsPage() {
   const { data: requisitions = [], isLoading } = useRequisitions();
+  const { data: departments = [] } = useMasterCollection("departmentMasters");
+  const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
   const createRequisition = useCreateRequisition();
   const [open, setOpen] = useState(false);
 
@@ -97,9 +99,9 @@ export function RequisitionsPage() {
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
-                      {DEPARTMENTS.map((d) => (
-                        <SelectItem key={d} value={d}>
-                          {d}
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.name}>
+                          {d.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -111,9 +113,9 @@ export function RequisitionsPage() {
                       <SelectValue placeholder="Select purpose" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PURPOSES.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
+                      {purposes.map((p) => (
+                        <SelectItem key={p.id} value={p.name}>
+                          {p.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

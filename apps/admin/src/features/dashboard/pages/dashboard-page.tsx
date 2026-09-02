@@ -11,7 +11,7 @@ import { useOpenTrips, useTrips } from "@/features/trips/hooks";
 import { useFuelEntries } from "@/features/fuel/hooks";
 import { useAlerts } from "@/features/alerts/hooks";
 import { formatCurrency, formatDateTime } from "@/lib/formatters";
-import { tripDurationStatus, formatDuration } from "@/services/trips.service";
+import { formatDuration } from "@/services/trips.service";
 import { buildDailySeries, buildStatusBreakdown } from "@/features/dashboard/lib/chart-data";
 import { ActivityTrendChart } from "@/features/dashboard/components/activity-trend-chart";
 import { FuelSpendChart } from "@/features/dashboard/components/fuel-spend-chart";
@@ -133,7 +133,7 @@ export function DashboardPage() {
                       {trip.purpose} → {trip.destination} · {formatDuration(trip.outTime)}
                     </p>
                   </div>
-                  <StatusBadge status={tripDurationStatus(trip)} className="shrink-0" />
+                  <StatusBadge status={trip.tripDurationStatus ?? "normal"} className="shrink-0" />
                 </div>
               );
             })}

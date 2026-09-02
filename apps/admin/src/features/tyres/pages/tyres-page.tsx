@@ -4,7 +4,6 @@ import { DataTable } from "@/components/shared/data-table";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { useTyres } from "@/features/tyres/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
-import { tyreMileage, tyreRemainingKm } from "@/services/tyres.service";
 import { formatKm } from "@/lib/formatters";
 import type { Tyre } from "@/types";
 
@@ -27,7 +26,7 @@ export function TyresPage() {
       header: "Mileage Used",
       cell: ({ row }) => {
         const vehicle = vehicles.find((v) => v.id === row.original.vehicleId);
-        return vehicle ? formatKm(tyreMileage(row.original, vehicle.currentOdometer)) : "—";
+        return vehicle ? formatKm(row.original.mileage ?? 0) : "—";
       },
     },
     {
@@ -36,7 +35,7 @@ export function TyresPage() {
       cell: ({ row }) => {
         const vehicle = vehicles.find((v) => v.id === row.original.vehicleId);
         if (!vehicle) return "—";
-        const remaining = tyreRemainingKm(row.original, vehicle.currentOdometer);
+        const remaining = row.original.remainingKm ?? row.original.expectedLifeKm;
         return (
           <span className="flex items-center gap-2">
             {formatKm(Math.abs(remaining))} {remaining < 0 && "over"}

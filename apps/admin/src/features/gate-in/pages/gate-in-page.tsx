@@ -35,7 +35,7 @@ export function GateInPage() {
       toast.error("Vehicle not found for that code.");
       return;
     }
-    const openTrip = getOpenTripForVehicle(found.id);
+    const openTrip = await getOpenTripForVehicle(found.id);
     if (!openTrip) {
       toast.error(`No open trip found for ${found.registrationNumber}.`);
       return;

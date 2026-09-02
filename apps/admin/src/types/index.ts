@@ -106,6 +106,8 @@ export interface Trip {
   returnCondition?: ReturnCondition;
   remarks?: string;
   expectedReturn?: string;
+  /** Server-computed, never stored — see fleet.serializers.TripSerializer. */
+  tripDurationStatus?: TripDurationStatus;
 }
 
 export interface FuelEntry {
@@ -145,6 +147,9 @@ export interface MaintenanceRecord {
   nextDueOdometer?: number;
   nextDueDate?: string;
   remarks?: string;
+  /** Server-computed, never stored — see maintenance.serializers.MaintenanceRecordSerializer. */
+  remainingKm?: number;
+  maintenanceAlertStatus?: MaintenanceAlertStatus;
 }
 
 export type MaintenanceAlertStatus = "normal" | "due_soon" | "urgent" | "overdue";
@@ -161,6 +166,9 @@ export interface Tyre {
   installOdometer?: number;
   expectedLifeKm: number;
   status: "in_use" | "spare" | "scrap" | "store";
+  /** Server-computed, never stored — see maintenance.serializers.TyreSerializer. */
+  mileage?: number;
+  remainingKm?: number;
 }
 
 export type DocumentAlertStatus = "ok" | "expiring_soon" | "expired";
@@ -169,10 +177,14 @@ export interface DocumentRecord {
   id: string;
   ownerType: "vehicle" | "driver";
   ownerId: string;
-  documentType: string;
+  /** FK into masterdata DocumentTypeMaster — resolve a display name from there, not a label string. */
+  documentTypeId: string;
   documentNumber?: string;
   issueDate?: string;
   expiryDate: string;
+  /** Server-computed, never stored — see documents.serializers.DocumentRecordSerializer. */
+  daysUntil?: number;
+  documentAlertStatus?: DocumentAlertStatus;
 }
 
 export interface Requisition {

@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/shared/form-field";
 import { Input } from "@/components/ui/input";
-import { PURPOSES, DEPARTMENTS } from "@/services/mock/fixtures";
 import { useSettings, useUpdateMaintenanceThresholds } from "@/features/settings/hooks";
+import { useMasterCollection } from "@/features/master-data/hooks";
 
 const THEME_SWATCHES = [
   { label: "Primary (brass)", var: "--primary" },
@@ -18,6 +18,9 @@ const THEME_SWATCHES = [
 ];
 
 export function SettingsPage() {
+  const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
+  const { data: departments = [] } = useMasterCollection("departmentMasters");
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Administration / Configuration" description="Company-wide masters, thresholds and theme." />
@@ -48,9 +51,9 @@ export function SettingsPage() {
           <CardTitle>Configurable Trip Purposes</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {PURPOSES.map((p) => (
-            <Badge key={p} variant="outline" dot={false}>
-              {p}
+          {purposes.map((p) => (
+            <Badge key={p.id} variant="outline" dot={false}>
+              {p.name}
             </Badge>
           ))}
         </CardContent>
@@ -61,9 +64,9 @@ export function SettingsPage() {
           <CardTitle>Departments</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {DEPARTMENTS.map((d) => (
-            <Badge key={d} variant="outline" dot={false}>
-              {d}
+          {departments.map((d) => (
+            <Badge key={d.id} variant="outline" dot={false}>
+              {d.name}
             </Badge>
           ))}
         </CardContent>

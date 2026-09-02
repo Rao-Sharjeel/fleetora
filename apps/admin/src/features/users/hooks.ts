@@ -17,7 +17,8 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<Omit<AppUser, "id">> }) => updateUser(id, patch),
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Omit<AppUser, "id">> & { password?: string } }) =>
+      updateUser(id, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 }

@@ -1,28 +1,25 @@
 import type { Guard } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { ApiError, apiGet, apiList, apiPost } from "@/lib/api-client";
 
 export async function listGuards(): Promise<Guard[]> {
-  return delay([...getDb().guards]);
+  return apiList<Guard>("/guards/");
 }
 
 export type CreateGuardPayload = Omit<Guard, "id" | "status"> & { status?: Guard["status"] };
 
 export async function createGuard(payload: CreateGuardPayload): Promise<Guard> {
-  const db = getDb();
-  const guard: Guard = {
-    ...payload,
-    id: nextId("grd"),
-    status: payload.status ?? "active",
-  };
-  db.guards.push(guard);
-  commit();
-  return delay(guard);
+  return apiPost<Guard>("/guards/", payload);
 }
 
 export async function getGuard(id: string): Promise<Guard | undefined> {
-  return delay(getDb().guards.find((g) => g.id === id));
+  return apiGet<Guard>(`/guards/${id}/`);
 }
 
 export async function getGuardByCode(code: string): Promise<Guard | undefined> {
-  return delay(getDb().guards.find((g) => g.guardId === code));
+  try {
+    return await apiGet<Guard>(`/guards/by-code/${encodeURIComponent(code)}/`);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return undefined;
+    throw err;
+  }
 }

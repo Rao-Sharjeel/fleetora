@@ -37,7 +37,7 @@ export function DriverPortalPage() {
                       {vehicle?.registrationNumber} · {trip.purpose} → {trip.destination}
                     </p>
                     <p className="text-muted-foreground">
-                      {formatDateTime(trip.outTime)} {trip.tripKm !== undefined && `· ${formatKm(trip.tripKm)}`}
+                      {formatDateTime(trip.outTime)} {trip.tripKm != null && `· ${formatKm(trip.tripKm)}`}
                     </p>
                   </div>
                   <StatusBadge status={trip.status} />

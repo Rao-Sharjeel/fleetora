@@ -1,20 +1,8 @@
 import type { AuditLogEntry } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { apiList } from "@/lib/api-client";
 
+/** Read-only — entries are only ever written server-side, as a side effect of the
+ * action that made the change (e.g. fleet.views.VehicleViewSet.set_allowed_to_exit). */
 export async function listAuditLog(): Promise<AuditLogEntry[]> {
-  return delay([...getDb().auditLog].sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
-}
-
-export type CreateAuditLogEntryPayload = Omit<AuditLogEntry, "id" | "timestamp">;
-
-export async function createAuditLogEntry(payload: CreateAuditLogEntryPayload): Promise<AuditLogEntry> {
-  const db = getDb();
-  const entry: AuditLogEntry = {
-    ...payload,
-    id: nextId("audit"),
-    timestamp: new Date().toISOString(),
-  };
-  db.auditLog.push(entry);
-  commit();
-  return delay(entry);
+  return apiList<AuditLogEntry>("/audit-log/"); // backend orders -timestamp already
 }

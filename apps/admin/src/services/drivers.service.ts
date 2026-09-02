@@ -1,33 +1,31 @@
 import type { Driver } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { ApiError, apiGet, apiList, apiPost } from "@/lib/api-client";
 
 export async function listDrivers(): Promise<Driver[]> {
-  return delay([...getDb().drivers]);
+  const drivers = await apiList<WireDriver>("/drivers/");
+  return drivers.map(fromWireDriver);
 }
 
 export type CreateDriverPayload = Omit<Driver, "id" | "employeeId" | "status"> & { status?: Driver["status"] };
 
 export async function createDriver(payload: CreateDriverPayload): Promise<Driver> {
-  const db = getDb();
-  const seq = db.drivers.length + 101;
-  const driver: Driver = {
-    ...payload,
-    id: nextId("drv"),
-    employeeId: `EMP-${seq}`,
-    status: payload.status ?? "active",
-  };
-  db.drivers.push(driver);
-  commit();
-  return delay(driver);
+  const driver = await apiPost<WireDriver>("/drivers/", toWireDriver(payload));
+  return fromWireDriver(driver);
 }
 
 export async function getDriver(id: string): Promise<Driver | undefined> {
-  return delay(getDb().drivers.find((d) => d.id === id));
+  const driver = await apiGet<WireDriver>(`/drivers/${id}/`);
+  return fromWireDriver(driver);
 }
 
 export async function getDriverByCode(code: string): Promise<Driver | undefined> {
-  const db = getDb();
-  return delay(db.drivers.find((d) => d.employeeId === code || d.companyIdCode === code));
+  try {
+    const driver = await apiGet<WireDriver>(`/drivers/by-code/${encodeURIComponent(code)}/`);
+    return fromWireDriver(driver);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return undefined;
+    throw err;
+  }
 }
 
 export function licenceStatus(licenceExpiry: string): "valid" | "expiring_soon" | "expired" {
@@ -35,4 +33,22 @@ export function licenceStatus(licenceExpiry: string): "valid" | "expiring_soon" 
   if (days < 0) return "expired";
   if (days <= 30) return "expiring_soon";
   return "valid";
+}
+
+/** The wire shape has the 4 "other details" booleans flat on the Driver object;
+ * the app's Driver type nests them under otherDetails. Mapped here so the rest of
+ * the UI (driver form/list) never has to know the wire shape differs. */
+type OtherDetails = NonNullable<Driver["otherDetails"]>;
+type WireDriver = Omit<Driver, "otherDetails"> & Partial<OtherDetails>;
+
+function fromWireDriver(wire: WireDriver): Driver {
+  const { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed, ...rest } = wire;
+  return { ...rest, otherDetails: { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed } };
+}
+
+function toWireDriver<T extends { otherDetails?: Driver["otherDetails"] }>(
+  payload: T,
+): Omit<T, "otherDetails"> & Partial<OtherDetails> {
+  const { otherDetails, ...rest } = payload;
+  return { ...rest, ...otherDetails };
 }

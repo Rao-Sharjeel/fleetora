@@ -30,10 +30,11 @@ const schema = z.object({
   email: z.string().min(1, "Required").email("Enter a valid email"),
   role: z.custom<Role>((v) => typeof v === "string" && v.length > 0, "Required"),
   active: z.boolean(),
+  password: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
-const defaultValues: FormValues = { name: "", email: "", role: "fleet_manager", active: true };
+const defaultValues: FormValues = { name: "", email: "", role: "fleet_manager", active: true, password: "" };
 
 export function UsersPage() {
   const { data: users = [], isLoading } = useUsers();
@@ -52,16 +53,21 @@ export function UsersPage() {
 
   function openEdit(user: AppUser) {
     setEditingId(user.id);
-    form.reset({ name: user.name, email: user.email, role: user.role, active: user.active });
+    form.reset({ name: user.name, email: user.email, role: user.role, active: user.active, password: "" });
     setOpen(true);
   }
 
   async function onSubmit(values: FormValues) {
     if (editingId) {
-      await updateUser.mutateAsync({ id: editingId, patch: values });
+      const { password, ...rest } = values;
+      await updateUser.mutateAsync({ id: editingId, patch: password ? values : rest });
       toast.success("User updated.");
     } else {
-      await createUser.mutateAsync(values);
+      if (!values.password) {
+        form.setError("password", { message: "Required" });
+        return;
+      }
+      await createUser.mutateAsync({ ...values, password: values.password });
       toast.success(`${values.name} added.`);
     }
     setOpen(false);
@@ -143,6 +149,16 @@ export function UsersPage() {
                       <Switch checked={form.watch("active")} onCheckedChange={(v) => form.setValue("active", v === true)} />
                       <span className="text-sm text-muted-foreground">{form.watch("active") ? "Active" : "Inactive"}</span>
                     </div>
+                  </FormField>
+                  <FormField
+                    label={editingId ? "New Password" : "Password"}
+                    error={form.formState.errors.password?.message}
+                  >
+                    <Input
+                      type="password"
+                      {...form.register("password")}
+                      placeholder={editingId ? "Leave blank to keep current" : "Set an initial password"}
+                    />
                   </FormField>
                 </div>
                 <DialogFooter>

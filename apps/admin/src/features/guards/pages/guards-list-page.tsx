@@ -25,7 +25,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateGuard, useGuards } from "@/features/guards/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
-import { DEPARTMENTS } from "@/services/mock/fixtures";
 import type { Guard } from "@/types";
 
 const schema = z.object({
@@ -86,6 +85,7 @@ const columns: ColumnDef<Guard>[] = [
 export function GuardsListPage() {
   const { data: guards = [], isLoading } = useGuards();
   const { data: gates = [] } = useMasterCollection("gates");
+  const { data: departments = [] } = useMasterCollection("departmentMasters");
   const createGuard = useCreateGuard();
   const [open, setOpen] = useState(false);
 
@@ -148,9 +148,9 @@ export function GuardsListPage() {
                         <SelectValue placeholder="Select department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {DEPARTMENTS.map((d) => (
-                          <SelectItem key={d} value={d}>
-                            {d}
+                        {departments.map((d) => (
+                          <SelectItem key={d.id} value={d.name}>
+                            {d.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

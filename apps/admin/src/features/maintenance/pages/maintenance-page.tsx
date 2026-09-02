@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMaintenanceRecords, useCreateMaintenanceRecord } from "@/features/maintenance/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
-import { maintenanceAlertStatus } from "@/services/maintenance.service";
 import { formatCurrency, formatDate, formatKm } from "@/lib/formatters";
 import type { MaintenanceCategory } from "@/types";
 
@@ -158,12 +157,11 @@ export function MaintenancePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {records.map((record) => {
             const vehicle = vehicles.find((v) => v.id === record.vehicleId);
-            const remaining = record.nextDueOdometer && vehicle ? record.nextDueOdometer - vehicle.currentOdometer : undefined;
             return (
               <Card key={record.id}>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>{vehicle?.registrationNumber ?? record.vehicleId}</CardTitle>
-                  {remaining !== undefined && <StatusBadge status={maintenanceAlertStatus(remaining)} />}
+                  {record.maintenanceAlertStatus && <StatusBadge status={record.maintenanceAlertStatus} />}
                 </CardHeader>
                 <CardContent className="flex flex-col gap-1 text-sm">
                   <p className="font-medium capitalize">{record.categories.join(", ")}</p>
@@ -171,8 +169,10 @@ export function MaintenancePage() {
                     {formatDate(record.date)} · {record.workshop} · {formatKm(record.odometer)}
                   </p>
                   <p className="text-muted-foreground">Cost: {formatCurrency(record.totalCost)}</p>
-                  {remaining !== undefined && (
-                    <p className="text-muted-foreground">{formatKm(Math.abs(remaining))} {remaining >= 0 ? "remaining" : "overdue"}</p>
+                  {record.remainingKm != null && (
+                    <p className="text-muted-foreground">
+                      {formatKm(Math.abs(record.remainingKm))} {record.remainingKm >= 0 ? "remaining" : "overdue"}
+                    </p>
                   )}
                 </CardContent>
               </Card>

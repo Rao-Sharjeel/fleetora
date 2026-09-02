@@ -1,25 +1,20 @@
 import type { AppUser } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { apiList, apiPatch, apiPost } from "@/lib/api-client";
 
 export async function listUsers(): Promise<AppUser[]> {
-  return delay([...getDb().users]);
+  return apiList<AppUser>("/users/");
 }
 
-export type CreateUserPayload = Omit<AppUser, "id">;
+export type CreateUserPayload = Omit<AppUser, "id"> & { password: string };
 
 export async function createUser(payload: CreateUserPayload): Promise<AppUser> {
-  const db = getDb();
-  const user: AppUser = { ...payload, id: nextId("usr") };
-  db.users.push(user);
-  commit();
-  return delay(user);
+  return apiPost<AppUser>("/users/", payload);
 }
 
-export async function updateUser(id: string, patch: Partial<Omit<AppUser, "id">>): Promise<AppUser> {
-  const db = getDb();
-  const user = db.users.find((u) => u.id === id);
-  if (!user) throw new Error(`User ${id} not found`);
-  Object.assign(user, patch);
-  commit();
-  return delay(user);
+/** password is optional here — omit it to leave the existing password unchanged. */
+export async function updateUser(
+  id: string,
+  patch: Partial<Omit<AppUser, "id">> & { password?: string },
+): Promise<AppUser> {
+  return apiPatch<AppUser>(`/users/${id}/`, patch);
 }

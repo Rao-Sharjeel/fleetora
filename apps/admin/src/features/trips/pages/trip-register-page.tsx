@@ -35,7 +35,7 @@ export function TripRegisterPage() {
     {
       accessorKey: "tripKm",
       header: "Trip KM",
-      cell: ({ getValue }) => (getValue<number | undefined>() !== undefined ? formatKm(getValue<number>()) : "—"),
+      cell: ({ getValue }) => formatKm(getValue<number | null | undefined>()),
     },
     {
       accessorKey: "status",

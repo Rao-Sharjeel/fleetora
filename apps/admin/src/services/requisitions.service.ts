@@ -1,21 +1,14 @@
 import type { Requisition } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { apiList, apiPost } from "@/lib/api-client";
 
 export async function listRequisitions(): Promise<Requisition[]> {
-  return delay([...getDb().requisitions].sort((a, b) => b.requiredDateTime.localeCompare(a.requiredDateTime)));
+  return apiList<Requisition>("/requisitions/"); // backend orders -required_date_time already
 }
 
 export type CreateRequisitionPayload = Omit<Requisition, "id" | "requisitionNumber" | "status">;
 
+/** requisitionNumber and status (starts "pending") are server-assigned — status only
+ * moves via POST /requisitions/{id}/approve|reject/, not yet wired into this UI. */
 export async function createRequisition(payload: CreateRequisitionPayload): Promise<Requisition> {
-  const db = getDb();
-  const requisition: Requisition = {
-    ...payload,
-    id: nextId("req"),
-    requisitionNumber: `REQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 8999)}`,
-    status: "pending",
-  };
-  db.requisitions.push(requisition);
-  commit();
-  return delay(requisition);
+  return apiPost<Requisition>("/requisitions/", payload);
 }

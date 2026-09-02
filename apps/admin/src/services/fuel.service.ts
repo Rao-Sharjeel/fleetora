@@ -1,23 +1,15 @@
 import type { FuelEntry } from "@/types";
-import { getDb, delay, commit, nextId } from "@/services/mock/db";
+import { apiList, apiPost } from "@/lib/api-client";
 
 export async function listFuelEntries(): Promise<FuelEntry[]> {
-  return delay([...getDb().fuelEntries].sort((a, b) => b.dateTime.localeCompare(a.dateTime)));
+  return apiList<FuelEntry>("/fuel-entries/"); // backend orders newest-first already
 }
 
 export type CreateFuelEntryPayload = Omit<FuelEntry, "id" | "total" | "dateTime"> & { dateTime?: string };
 
 export async function createFuelEntry(payload: CreateFuelEntryPayload): Promise<FuelEntry> {
-  const db = getDb();
-  const entry: FuelEntry = {
-    ...payload,
-    id: nextId("fuel"),
-    dateTime: payload.dateTime ?? new Date().toISOString(),
-    total: payload.litres * payload.ratePerLitre,
-  };
-  db.fuelEntries.push(entry);
-  commit();
-  return delay(entry);
+  // total is recomputed server-side from litres x rate — never accepted from a client.
+  return apiPost<FuelEntry>("/fuel-entries/", payload);
 }
 
 export function vehicleFuelStats(vehicleId: string, entries: FuelEntry[], benchmarkKmpl: number) {

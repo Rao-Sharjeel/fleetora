@@ -1,9 +1,13 @@
-export function formatKm(value: number): string {
-  return `${value.toLocaleString()} KM`;
+/** Accepts string too — DRF serializes DecimalFields as strings on the wire, and
+ * optional numeric fields (e.g. Vehicle.oilChangeKm) come back as null, not 0. */
+export function formatKm(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return `${Number(value).toLocaleString()} KM`;
 }
 
-export function formatCurrency(value: number): string {
-  return `Rs. ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+export function formatCurrency(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return `Rs. ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 export function formatDateTime(iso: string): string {

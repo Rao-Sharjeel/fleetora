@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { useDocuments } from "@/features/documents/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
 import { useDrivers } from "@/features/drivers/hooks";
-import { documentAlertStatus, daysUntil } from "@/services/documents.service";
+import { useMasterCollection } from "@/features/master-data/hooks";
 import { formatDate } from "@/lib/formatters";
 import type { DocumentRecord } from "@/types";
 
@@ -13,6 +13,7 @@ export function DocumentsPage() {
   const { data: documents = [], isLoading } = useDocuments();
   const { data: vehicles = [] } = useVehicles();
   const { data: drivers = [] } = useDrivers();
+  const { data: documentTypes = [] } = useMasterCollection("documentTypes");
 
   const columns: ColumnDef<DocumentRecord>[] = [
     {
@@ -26,18 +27,22 @@ export function DocumentsPage() {
       },
     },
     { accessorKey: "ownerType", header: "Type", cell: ({ getValue }) => <span className="capitalize">{getValue<string>()}</span> },
-    { accessorKey: "documentType", header: "Document" },
+    {
+      id: "documentType",
+      header: "Document",
+      cell: ({ row }) => documentTypes.find((t) => t.id === row.original.documentTypeId)?.name ?? "—",
+    },
     { accessorKey: "documentNumber", header: "Number", cell: ({ getValue }) => getValue<string>() ?? "—" },
     { accessorKey: "expiryDate", header: "Expiry", cell: ({ getValue }) => formatDate(getValue<string>()) },
     {
       id: "daysLeft",
       header: "Days Left",
-      cell: ({ row }) => daysUntil(row.original.expiryDate),
+      cell: ({ row }) => row.original.daysUntil ?? "—",
     },
     {
       id: "status",
       header: "Status",
-      cell: ({ row }) => <StatusBadge status={documentAlertStatus(row.original.expiryDate)} />,
+      cell: ({ row }) => row.original.documentAlertStatus && <StatusBadge status={row.original.documentAlertStatus} />,
     },
   ];
 
