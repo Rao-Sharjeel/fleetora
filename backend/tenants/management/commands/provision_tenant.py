@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from tenants.models import Domain, Tenant
+from tenants.services import TenantAlreadyExists, provision_tenant
 
 
 class Command(BaseCommand):
@@ -15,12 +15,10 @@ class Command(BaseCommand):
         parser.add_argument("domain", help="API hostname for this tenant, e.g. 'acme.api.fleetora.com'")
 
     def handle(self, *args, **options):
-        schema_name = options["schema_name"]
-        if Tenant.objects.filter(schema_name=schema_name).exists():
-            raise CommandError(f"Tenant with schema_name '{schema_name}' already exists.")
+        try:
+            tenant = provision_tenant(options["schema_name"], options["name"], options["domain"])
+        except TenantAlreadyExists as exc:
+            raise CommandError(str(exc)) from exc
 
-        tenant = Tenant.objects.create(schema_name=schema_name, name=options["name"])
-        Domain.objects.create(domain=options["domain"], tenant=tenant, is_primary=True)
-
-        self.stdout.write(self.style.SUCCESS(f"Created tenant '{tenant.name}' (schema: {schema_name})"))
+        self.stdout.write(self.style.SUCCESS(f"Created tenant '{tenant.name}' (schema: {tenant.schema_name})"))
         self.stdout.write(f"  Domain: {options['domain']}")

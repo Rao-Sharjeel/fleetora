@@ -54,6 +54,10 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 TENANT_MODEL = "tenants.Tenant"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = "public"
+# Used only when a request resolves to the public tenant itself (the Super Admin
+# API/dashboard's domain — see bootstrap_public_tenant) — every other host keeps
+# using ROOT_URLCONF (fleetora.urls) unchanged.
+PUBLIC_SCHEMA_URLCONF = "fleetora.urls_public"
 
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 
@@ -136,6 +140,12 @@ REST_FRAMEWORK = {
     # a real fleet's trip/fuel history.
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
+    # DRF's default renders DecimalFields as JSON strings ("18500.00"). Every TS
+    # interface types these as `number` (FuelEntry.litres/ratePerLitre/total,
+    # MaintenanceRecord.totalCost, ...) and does real arithmetic on them client-side
+    # (vehicleFuelStats, dashboard/report aggregation) — a string there silently
+    # turns `sum + entry.total` into string concatenation, not addition.
+    "COERCE_DECIMAL_TO_STRING": False,
     # Serializers stay Pythonic snake_case; the JSON wire format is camelCase,
     # matching every TS interface in src/types/index.ts field-for-field.
     "DEFAULT_RENDERER_CLASSES": [

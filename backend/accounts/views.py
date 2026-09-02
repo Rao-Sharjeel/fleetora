@@ -4,9 +4,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from accounts.models import User
+from accounts.models import KioskDevice, User
 from accounts.permissions import allow_roles
-from accounts.serializers import FleetoraTokenObtainPairSerializer, UserManageSerializer, UserSerializer
+from accounts.serializers import (
+    FleetoraTokenObtainPairSerializer,
+    KioskDeviceCreateSerializer,
+    KioskDeviceSerializer,
+    UserManageSerializer,
+    UserSerializer,
+)
 
 
 class LoginView(TokenObtainPairView):
@@ -31,3 +37,17 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by("username")
     serializer_class = UserManageSerializer
     permission_classes = [allow_roles("admin")]
+
+
+class KioskDeviceViewSet(viewsets.ModelViewSet):
+    """/api/kiosk-devices/ — the Kiosk Devices screen. Admin-only. The kiosk apps
+    themselves never call this; they authenticate via KioskDeviceAuthentication
+    using the api_key this issues, not by hitting this endpoint."""
+
+    queryset = KioskDevice.objects.all().order_by("-created_at")
+    permission_classes = [allow_roles("admin")]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return KioskDeviceCreateSerializer
+        return KioskDeviceSerializer
