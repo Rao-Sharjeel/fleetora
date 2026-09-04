@@ -51,8 +51,9 @@ export interface StaffIdCardParams {
   /** The D-RIVE ID encoded in the QR — a Guard's guardId or a Driver's employeeId. */
   id: string;
   name: string;
+  /** Job title, e.g. "Security Guard" or "Driver". */
   role: string;
-  photoUrl?: string;
+  department?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -69,14 +70,19 @@ function escapeHtml(value: string): string {
  * person's D-RIVE ID — the same ID the Exit/Entry/Fuel kiosks resolve via getGuardByCode
  * / getDriverByCode, so this card is what a guard or driver scans at the gate. Bottom half
  * of the card is dedicated entirely to the QR code so it's easy to scan at a glance.
+ *
+ * `.top`/`.bottom` need `min-height: 0` — flex items default to `min-height: auto`, which
+ * lets their content refuse to shrink below its natural size. Without it, content taller
+ * than half the fixed-height card silently overflows the page and Chrome's print pipeline
+ * spills the overflow onto a second page instead of clipping it.
  */
-export async function printStaffIdCard({ id, name, role, photoUrl }: StaffIdCardParams): Promise<void> {
+export async function printStaffIdCard({ id, name, role, department }: StaffIdCardParams): Promise<void> {
   const dataUrl = await QRCode.toDataURL(id, { width: 500, margin: 1 });
   const logoUrl = `${window.location.origin}/drive-logo.png`;
   const safeName = escapeHtml(name);
   const safeRole = escapeHtml(role);
   const safeId = escapeHtml(id);
-  const initial = escapeHtml(name.trim().charAt(0).toUpperCase() || "?");
+  const safeDepartment = department ? escapeHtml(department) : null;
 
   const win = window.open("", "_blank", "width=420,height=650");
   if (!win) return;
@@ -100,34 +106,18 @@ export async function printStaffIdCard({ id, name, role, photoUrl }: StaffIdCard
       }
       .top {
         flex: 1;
+        min-height: 0;
         background: linear-gradient(160deg, #0b1220 0%, #131f38 100%);
         color: #fff;
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 0.14in 0.18in 0.16in;
+        padding: 0.16in 0.18in 0.14in;
       }
-      .logo { width: 0.95in; height: auto; object-fit: contain; margin-bottom: 0.14in; }
-      .photo {
-        width: 0.62in;
-        height: 0.62in;
-        border-radius: 999px;
-        object-fit: cover;
-        background: #1c2947;
-        border: 2px solid rgba(255, 255, 255, 0.35);
-      }
-      .photo-fallback {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        font-weight: 700;
-        color: #7fd4ff;
-      }
+      .logo { width: 0.8in; height: auto; object-fit: contain; margin-bottom: 0.16in; }
       .name {
-        margin-top: 0.12in;
-        font-size: 14px;
-        font-weight: 700;
+        font-size: 16px;
+        font-weight: 800;
         text-align: center;
         line-height: 1.2;
         overflow: hidden;
@@ -136,34 +126,41 @@ export async function printStaffIdCard({ id, name, role, photoUrl }: StaffIdCard
         max-width: 100%;
       }
       .role {
-        margin-top: 0.02in;
-        font-size: 9.5px;
-        color: #9fb0d1;
+        margin-top: 0.04in;
+        font-size: 11px;
+        font-weight: 600;
+        color: #7fd4ff;
         text-transform: uppercase;
         letter-spacing: 0.03em;
       }
+      .department {
+        margin-top: 0.02in;
+        font-size: 9px;
+        color: #8b96b3;
+      }
       .id-chip {
         margin-top: auto;
-        padding: 0.045in 0.14in;
+        padding: 0.05in 0.16in;
         border-radius: 999px;
         background: #1e9be0;
         color: #fff;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.03em;
         font-variant-numeric: tabular-nums;
       }
       .bottom {
         flex: 1;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 0.08in;
-        padding: 0.14in;
+        gap: 0.06in;
+        padding: 0.1in;
         border-top: 1px solid #e5e9f2;
       }
-      .qr { width: 1.35in; height: 1.35in; }
+      .qr { width: 1.25in; height: 1.25in; }
       .scan-label {
         font-size: 8px;
         font-weight: 600;
@@ -176,13 +173,9 @@ export async function printStaffIdCard({ id, name, role, photoUrl }: StaffIdCard
   <body>
     <div class="top">
       <img class="logo" src="${logoUrl}" alt="D-RIVE" />
-      ${
-        photoUrl
-          ? `<img class="photo" src="${escapeHtml(photoUrl)}" alt="${safeName}" />`
-          : `<div class="photo photo-fallback">${initial}</div>`
-      }
       <div class="name">${safeName}</div>
       <div class="role">${safeRole}</div>
+      ${safeDepartment ? `<div class="department">${safeDepartment}</div>` : ""}
       <div class="id-chip">${safeId}</div>
     </div>
     <div class="bottom">

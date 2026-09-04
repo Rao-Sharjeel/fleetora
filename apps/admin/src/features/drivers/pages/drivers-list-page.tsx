@@ -94,8 +94,8 @@ const columns: ColumnDef<Driver>[] = [
           printStaffIdCard({
             id: row.original.employeeId,
             name: row.original.name,
-            role: row.original.department,
-            photoUrl: row.original.photoUrl,
+            role: "Driver",
+            department: row.original.department,
           });
         }}
       >

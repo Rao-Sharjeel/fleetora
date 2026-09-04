@@ -71,8 +71,8 @@ const columns: ColumnDef<Guard>[] = [
           printStaffIdCard({
             id: row.original.guardId,
             name: row.original.name,
-            role: row.original.department ?? row.original.guardType,
-            photoUrl: row.original.photoUrl,
+            role: row.original.guardType,
+            department: row.original.department,
           });
         }}
       >
