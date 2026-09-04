@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { KioskShell, CameraView, decodeQr, recognizeOdometerDigits, getVehicleByCode } from "@fleetora/kiosk-core";
 import { useEntrySession } from "@/state/entry-session";
 
@@ -7,12 +7,26 @@ export function CaptureOdometerQrPage() {
   const setStep = useEntrySession((s) => s.setStep);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [qrLocked, setQrLocked] = useState(false);
+  // Fed by CameraView's background scan — the odometer needs a still frame for
+  // OCR so capture stays a manual tap, but the QR doesn't have to be readable
+  // in that exact tapped frame: any successful read while framing the shot wins.
+  const liveQrRef = useRef<string | null>(null);
+
+  function handleLiveQr(value: string) {
+    liveQrRef.current = value;
+    setQrLocked(true);
+  }
 
   async function handleCapture(canvas: HTMLCanvasElement, dataUrl: string) {
     setBusy(true);
     setMessage(null);
+    const fallbackQr = liveQrRef.current;
+    liveQrRef.current = null;
+    setQrLocked(false);
     try {
-      const [qrValue, odometerGuess] = await Promise.all([decodeQr(canvas), recognizeOdometerDigits(canvas)]);
+      const [tappedQr, odometerGuess] = await Promise.all([decodeQr(canvas), recognizeOdometerDigits(canvas)]);
+      const qrValue = tappedQr ?? fallbackQr;
 
       if (!qrValue) {
         setMessage("QR code not detected. Please retake, keeping the QR code in frame.");
@@ -50,7 +64,12 @@ export function CaptureOdometerQrPage() {
       {busy ? (
         <div className="flex flex-1 items-center justify-center text-sm text-kiosk-muted">Reading odometer & QR…</div>
       ) : (
-        <CameraView variant="frame" hint="Frame the odometer and QR code together" onCapture={handleCapture} />
+        <CameraView
+          variant="frame"
+          hint={qrLocked ? "QR code detected — capture when the odometer is clear" : "Frame the odometer and QR code together"}
+          onCapture={handleCapture}
+          onDetectQr={handleLiveQr}
+        />
       )}
       {import.meta.env.DEV && (
         <button
