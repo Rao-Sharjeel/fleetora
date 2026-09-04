@@ -79,7 +79,12 @@ export function ScanIdCardScreen<T>({
       {busy ? (
         <div className="flex flex-1 items-center justify-center text-sm text-kiosk-muted">Checking ID…</div>
       ) : (
-        <CameraView variant="frame" hint="Position the QR code inside the frame to scan" onCapture={handleCapture} />
+        <CameraView
+          variant="frame"
+          hint="Position the QR code inside the frame to scan"
+          onCapture={handleCapture}
+          onDetectQr={resolveCode}
+        />
       )}
       {import.meta.env.DEV && devSkipCode && (
         <button type="button" onClick={() => resolveCode(devSkipCode)} className="text-xs text-kiosk-muted underline">

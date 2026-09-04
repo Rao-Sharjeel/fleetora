@@ -1,13 +1,45 @@
 import { useEffect, useRef, useState } from "react";
+import { decodeQr } from "../lib/barcode";
 
 interface CameraViewProps {
   onCapture: (canvas: HTMLCanvasElement, dataUrl: string) => void;
   /** "frame" = dashed corner brackets for scanning a card/QR; "photo" = plain rounded viewfinder. */
   variant?: "frame" | "photo";
   hint?: string;
+  /**
+   * When set, polls the live video feed for a QR code instead of waiting for a
+   * manual capture tap — a phone's camera app scans continuously until the code
+   * locks in, and a single frame grabbed at the moment of a tap misses far more
+   * often (autofocus mid-hunt, motion blur, code not quite in frame yet). The
+   * capture button still works as a manual fallback.
+   */
+  onDetectQr?: (value: string) => void;
 }
 
-export function CameraView({ onCapture, variant = "photo", hint }: CameraViewProps) {
+/** How often (ms) to sample a frame from the live video while onDetectQr is
+ * active. Frequent enough to feel instant, spaced out enough to not pin a
+ * kiosk tablet's CPU running full-frame QR decode every tick. */
+const QR_SCAN_INTERVAL_MS = 300;
+
+/**
+ * Low-res default streams (some Android WebViews land on ~640x480) make both
+ * the QR decoder and the odometer OCR miss far more often than a phone's own
+ * camera app, which always requests a high-res stream — so ask for one too.
+ * `focusMode` isn't in TS's DOM lib (non-standard, but widely supported on
+ * Android Chrome and silently ignored where it isn't); cast past that gap
+ * rather than widening the whole constraints type.
+ */
+const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  video: {
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 },
+    advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+  },
+  audio: false,
+};
+
+export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,10 +51,7 @@ export function CameraView({ onCapture, variant = "photo", hint }: CameraViewPro
     async function start() {
       setError(null);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-          audio: false,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -44,6 +73,36 @@ export function CameraView({ onCapture, variant = "photo", hint }: CameraViewPro
       streamRef.current = null;
     };
   }, [attempt]);
+
+  useEffect(() => {
+    if (!onDetectQr) return;
+    let cancelled = false;
+    let busy = false;
+
+    const timer = window.setInterval(async () => {
+      if (busy || cancelled) return;
+      const video = videoRef.current;
+      if (!video || video.videoWidth === 0) return;
+      busy = true;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const value = await decodeQr(canvas);
+        if (value && !cancelled) onDetectQr(value);
+      } finally {
+        busy = false;
+      }
+    }, QR_SCAN_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [onDetectQr]);
 
   function capture() {
     const video = videoRef.current;
