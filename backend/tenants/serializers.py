@@ -1,21 +1,14 @@
-from django_tenants.utils import schema_context
 from rest_framework import serializers
 
-from tenants.models import Domain, Tenant
+from tenants.models import Tenant
 from tenants.services import TenantAlreadyExists, provision_tenant
 
 
 class TenantSerializer(serializers.ModelSerializer):
-    domain = serializers.SerializerMethodField()
-
     class Meta:
         model = Tenant
-        fields = ["id", "schema_name", "name", "domain", "created_at"]
+        fields = ["id", "schema_name", "name", "created_at"]
         read_only_fields = fields
-
-    def get_domain(self, obj: Tenant) -> str | None:
-        primary = obj.get_primary_domain()
-        return primary.domain if primary else None
 
 
 class TenantCreateSerializer(serializers.Serializer):
@@ -25,35 +18,35 @@ class TenantCreateSerializer(serializers.Serializer):
 
     schema_name = serializers.SlugField(max_length=63)
     name = serializers.CharField(max_length=120)
-    domain = serializers.CharField(max_length=253)
     admin_email = serializers.EmailField(write_only=True)
     admin_password = serializers.CharField(write_only=True, min_length=8)
 
-    def validate_domain(self, value: str) -> str:
-        if Domain.objects.filter(domain=value).exists():
-            raise serializers.ValidationError("This domain is already in use.")
+    def validate_admin_email(self, value: str) -> str:
+        from accounts.models import User
+
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
         return value
 
     def create(self, validated_data):
         try:
-            tenant = provision_tenant(
-                validated_data["schema_name"], validated_data["name"], validated_data["domain"]
-            )
+            tenant = provision_tenant(validated_data["schema_name"], validated_data["name"])
         except TenantAlreadyExists as exc:
             raise serializers.ValidationError({"schema_name": str(exc)}) from exc
 
-        # accounts.User is a TENANT_APP model — only reachable by switching into
-        # the new tenant's own schema, same pattern seed_dev_data already uses.
-        with schema_context(tenant.schema_name):
-            from accounts.models import User
+        # accounts.User is a SHARED_APP model now (single platform-wide table,
+        # tenant resolved via its own `tenant` FK) — no schema_context hop needed,
+        # this already runs in the public schema where the table lives.
+        from accounts.models import User
 
-            admin = User(
-                username=validated_data["admin_email"],
-                email=validated_data["admin_email"],
-                role=User.Role.ADMIN,
-                active=True,
-            )
-            admin.set_password(validated_data["admin_password"])
-            admin.save()
+        admin = User(
+            username=validated_data["admin_email"],
+            email=validated_data["admin_email"],
+            role=User.Role.ADMIN,
+            active=True,
+            tenant=tenant,
+        )
+        admin.set_password(validated_data["admin_password"])
+        admin.save()
 
         return tenant

@@ -2,22 +2,25 @@ from django.core.management.base import BaseCommand
 
 from tenants.models import Domain, Tenant
 
-PUBLIC_DOMAIN = "platform.localhost"
+PUBLIC_DOMAIN = "app.localhost"
 
 
 class Command(BaseCommand):
     """
     Creates the Tenant row for the public schema itself (schema_name="public")
-    plus a Domain pointing at it, so requests to that domain resolve to the
-    public schema and get PUBLIC_SCHEMA_URLCONF (the Super Admin API) instead
-    of a 404. Idempotent — safe to run more than once (e.g. on every deploy).
+    plus a Domain pointing at it — the *one* login domain for the whole
+    platform now (every tenant's users and the Super Admin API alike; user-based
+    multi-tenancy resolves the actual tenant from the logged-in user's own
+    `tenant` FK once authenticated, not from hostname — see
+    accounts.authentication.TenantAwareJWTAuthentication). Idempotent — safe to
+    run more than once (e.g. on every deploy).
 
     Tenant.save() only creates a Postgres schema if one doesn't already exist
     (see django_tenants.models.TenantMixin.create_schema's check_if_exists=True) —
     "public" already exists, so this never touches it, just adds the row.
     """
 
-    help = "Idempotently creates the public-schema Tenant + Domain the Super Admin API needs."
+    help = "Idempotently creates the public-schema Tenant + the platform's one shared login Domain."
 
     def add_arguments(self, parser):
         parser.add_argument(

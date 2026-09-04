@@ -4,14 +4,12 @@ export interface Tenant {
   id: string;
   schemaName: string;
   name: string;
-  domain: string | null;
   createdAt: string;
 }
 
 export interface CreateTenantPayload {
   schemaName: string;
   name: string;
-  domain: string;
   adminEmail: string;
   adminPassword: string;
 }

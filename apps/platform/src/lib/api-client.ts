@@ -1,6 +1,6 @@
 import { useSuperAdminSession } from "@/hooks/use-superadmin-session";
 
-const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://platform.localhost:8000/api/platform").replace(
+const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://app.localhost:8000/api/platform").replace(
   /\/+$/,
   "",
 );

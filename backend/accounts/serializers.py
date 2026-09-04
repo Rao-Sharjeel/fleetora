@@ -56,6 +56,7 @@ class UserManageSerializer(serializers.ModelSerializer):
             first_name=validated_data.get("name", ""),
             role=validated_data["role"],
             active=validated_data.get("active", True),
+            tenant=validated_data["tenant"],  # passed via serializer.save(tenant=...) — see UserViewSet.perform_create
         )
         user.set_password(password)
         user.save()

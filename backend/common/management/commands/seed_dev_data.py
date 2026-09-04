@@ -104,21 +104,34 @@ class Command(BaseCommand):
                 f"No tenant with schema_name '{schema_name}'. Create one first with create_tenant."
             ) from exc
 
+        # User/KioskDevice are SHARED_APP models now (one platform-wide table,
+        # tenant resolved via their own `tenant` FK) — seeded here, before
+        # switching schema, not inside schema_context like the tenant-scoped
+        # models below.
+        self._seed_users_and_devices(tenant)
+
         with schema_context(tenant.schema_name):
             self._seed(tenant)
 
-    def _seed(self, tenant):
-        self._seed_master_data()
-
+    def _seed_users_and_devices(self, tenant):
         for payload in USERS:
             user, created = User.objects.get_or_create(
                 username=payload["username"],
-                defaults={**payload, "email": payload["email"]},
+                defaults={**payload, "tenant": tenant},
             )
             if created:
                 user.set_password(DEFAULT_PASSWORD)
                 user.save()
         self.stdout.write(self.style.SUCCESS(f"Users ready ({len(USERS)}), password: {DEFAULT_PASSWORD}"))
+
+        device, created = KioskDevice.objects.get_or_create(name="Exit Kiosk (dev)", tenant=tenant, defaults={})
+        if created:
+            self.stdout.write(self.style.SUCCESS(f"Kiosk device API key: {device.api_key}"))
+        else:
+            self.stdout.write(self.style.SUCCESS(f"Kiosk device API key (existing): {device.api_key}"))
+
+    def _seed(self, tenant):
+        self._seed_master_data()
 
         drivers_by_employee_id = {}
         for payload in DRIVERS:
@@ -168,14 +181,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Open trip for LEX-7865 ready"))
 
         self._seed_operations(vehicles_by_internal_id, drivers_by_employee_id)
-
-        device, created = KioskDevice.objects.get_or_create(
-            name="Exit Kiosk (dev)", defaults={}
-        )
-        if created:
-            self.stdout.write(self.style.SUCCESS(f"Kiosk device API key: {device.api_key}"))
-        else:
-            self.stdout.write(self.style.SUCCESS(f"Kiosk device API key (existing): {device.api_key}"))
 
         # Advance the sequences past the manually-seeded numbers above, so the
         # next *real* create() call (via the API) doesn't collide with EMP-103/VEH-004.

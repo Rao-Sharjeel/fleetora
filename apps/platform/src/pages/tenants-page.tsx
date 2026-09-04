@@ -4,7 +4,7 @@ import { useSuperAdminSession } from "@/hooks/use-superadmin-session";
 import { ApiError } from "@/lib/api-client";
 import { createTenant, listTenants, type Tenant } from "@/lib/tenants.service";
 
-const emptyForm = { schemaName: "", name: "", domain: "", adminEmail: "", adminPassword: "" };
+const emptyForm = { schemaName: "", name: "", adminEmail: "", adminPassword: "" };
 
 export function TenantsPage() {
   const logout = useSuperAdminSession((s) => s.logout);
@@ -77,20 +77,19 @@ export function TenantsPage() {
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Schema</th>
-              <th className="px-4 py-3 font-medium">Domain</th>
               <th className="px-4 py-3 font-medium">Created</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-white/50">
+                <td colSpan={3} className="px-4 py-6 text-center text-white/50">
                   Loading…
                 </td>
               </tr>
             ) : tenants.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-white/50">
+                <td colSpan={3} className="px-4 py-6 text-center text-white/50">
                   No tenants yet.
                 </td>
               </tr>
@@ -99,7 +98,6 @@ export function TenantsPage() {
                 <tr key={t.id}>
                   <td className="px-4 py-3 font-medium">{t.name}</td>
                   <td className="px-4 py-3 text-white/70">{t.schemaName}</td>
-                  <td className="px-4 py-3 text-white/70">{t.domain ?? "—"}</td>
                   <td className="px-4 py-3 text-white/50">{new Date(t.createdAt).toLocaleDateString()}</td>
                 </tr>
               ))
@@ -124,12 +122,6 @@ export function TenantsPage() {
                 value={form.schemaName}
                 onChange={(v) => setForm({ ...form, schemaName: v })}
                 placeholder="acme"
-              />
-              <Field
-                label="API Domain"
-                value={form.domain}
-                onChange={(v) => setForm({ ...form, domain: v })}
-                placeholder="acme.api.fleetora.com"
               />
               <Field
                 label="Admin Email"

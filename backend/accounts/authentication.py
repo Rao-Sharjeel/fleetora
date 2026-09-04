@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AnonymousUser
+from django.db import connection
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from accounts.models import KioskDevice
 
@@ -25,4 +27,29 @@ class KioskDeviceAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Invalid or inactive kiosk device.") from exc
 
         device.touch()
+        # KioskDevice itself lives in the shared public schema (found above via
+        # the search path regardless of current schema — see its model docstring),
+        # but this device's actual data (vehicles, trips, ...) lives in its own
+        # tenant's schema. Switch there so the rest of this request's queries
+        # land in the right place, same as TenantAwareJWTAuthentication below.
+        connection.set_tenant(device.tenant)
         return (AnonymousUser(), device)
+
+
+class TenantAwareJWTAuthentication(JWTAuthentication):
+    """
+    Identical to the stock JWTAuthentication (AUTH_USER_MODEL didn't change,
+    only where its table lives) except for one addition: once the user is
+    resolved, switch the DB connection to their tenant's schema before the
+    view runs. This is what replaces hostname-based schema resolution now that
+    every tenant shares one login domain — TenantMainMiddleware leaves the
+    connection on the public schema (where accounts_user actually lives, so
+    the token's user lookup below resolves directly), and this class is what
+    moves it the rest of the way to the tenant's own schema for everything
+    the view itself queries (Vehicle, Trip, ...).
+    """
+
+    def get_user(self, validated_token):
+        user = super().get_user(validated_token)
+        connection.set_tenant(user.tenant)
+        return user
