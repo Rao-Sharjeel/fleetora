@@ -1,0 +1,65 @@
+# DB_PASSWORD is read from a .env file in this same directory (docker compose
+# loads that filename automatically) — never commit real values there. This
+# repo is public, unlike the sibling Procure project, so nothing here may be
+# a literal secret; every credential comes from an untracked .env/.env.production.
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fleetora_db
+      POSTGRES_USER: fleetora_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fleetora_user -d fleetora_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ./backend/.env.production
+    ports:
+      - "127.0.0.1:8091:8000"
+    volumes:
+      - ./media:/app/media
+    # migrate_schemas (not --shared) applies SHARED_APPS migrations to the
+    # public schema AND TENANT_APPS migrations to every existing tenant
+    # schema in one pass — the correct one to run on every boot, not just
+    # the first. Safe to run with zero tenants yet (first deploy).
+    command: >
+      sh -c "python manage.py migrate_schemas --noinput &&
+             gunicorn fleetora.wsgi:application --bind 0.0.0.0:8000 --workers 2
+             --max-requests 500 --max-requests-jitter 50
+             --capture-output --enable-stdio-inheritance
+             --access-logfile - --error-logfile - --log-level info"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: https://api.drive.dynamic-sourcing.com/api
+        VITE_PLATFORM_API_BASE_URL: https://api.drive.dynamic-sourcing.com/api/platform
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8092:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
