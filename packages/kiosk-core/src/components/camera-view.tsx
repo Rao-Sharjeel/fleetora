@@ -73,8 +73,8 @@ export function CameraView({ onCapture, variant = "photo", hint }: CameraViewPro
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <div className="relative flex-1 overflow-hidden rounded-2xl bg-black">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
         <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
         {variant === "frame" && (
           <div className="pointer-events-none absolute inset-8 rounded-xl border-2 border-dashed border-kiosk-accent/80" />

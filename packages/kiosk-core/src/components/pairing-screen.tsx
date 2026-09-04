@@ -5,6 +5,7 @@ import { useDeviceSession } from "../state/device-session";
 import { getVehicleByCode } from "../lib/kiosk-api";
 import { ApiError } from "../lib/api-client";
 import { PrimaryButton } from "./kiosk-shell";
+import { InstallBanner } from "./install-banner";
 
 /** Shown once per device, on first launch. A device key is issued from the admin
  * app's Kiosk Devices screen and typed in here — after that it's persisted
@@ -69,6 +70,7 @@ export function PairingScreen() {
           {busy ? "Checking…" : "Pair Device"}
         </PrimaryButton>
       </form>
+      <InstallBanner />
     </div>
   );
 }

@@ -11,8 +11,8 @@ interface KioskShellProps {
 /** Consistent full-screen card frame matching every step of the Exit flow reference design. */
 export function KioskShell({ onBack, children, footer }: KioskShellProps) {
   return (
-    <div className="flex min-h-dvh w-full flex-col bg-kiosk-bg text-kiosk-text">
-      <header className="flex items-center gap-3 border-b border-kiosk-border px-4 py-4">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-kiosk-bg text-kiosk-text">
+      <header className="flex shrink-0 items-center gap-3 border-b border-kiosk-border px-4 py-4">
         {onBack ? (
           <button type="button" onClick={onBack} aria-label="Back" className="text-kiosk-muted active:scale-95">
             <ChevronLeft className="h-5 w-5" />
@@ -26,8 +26,8 @@ export function KioskShell({ onBack, children, footer }: KioskShellProps) {
           <span className="text-sm font-extrabold tracking-wide text-kiosk-accent">{getKioskConfig().wordmark}</span>
         </div>
       </header>
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</main>
-      {footer && <footer className="flex flex-col gap-2 border-t border-kiosk-border p-4">{footer}</footer>}
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</main>
+      {footer && <footer className="flex shrink-0 flex-col gap-2 border-t border-kiosk-border p-4">{footer}</footer>}
     </div>
   );
 }

@@ -10,6 +10,9 @@ export { SplashScreen } from "./components/splash-screen";
 export { MobileOnlyGate } from "./components/mobile-only-gate";
 export { DeviceGate } from "./components/device-gate";
 export { PairingScreen } from "./components/pairing-screen";
+export { InstallBanner } from "./components/install-banner";
+
+export { useInstallPrompt } from "./hooks/use-install-prompt";
 
 export { decodeQr } from "./lib/barcode";
 export { recognizePlateText, recognizeOdometerDigits } from "./lib/ocr";
