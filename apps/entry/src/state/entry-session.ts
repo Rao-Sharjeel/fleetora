@@ -7,7 +7,8 @@ export type EntryStep =
   | "GUARD_IDENTIFIED"
   | "SCAN_DRIVER"
   | "DRIVER_IDENTIFIED"
-  | "CAPTURE_ODOMETER_QR"
+  | "SCAN_VEHICLE"
+  | "CAPTURE_ODOMETER"
   | "READING_EXTRACTED"
   | "NO_OPEN_TRIP_BLOCKED"
   | "RETURN_CONDITION"
@@ -32,7 +33,8 @@ interface EntrySessionState {
   setStep: (step: EntryStep) => void;
   setGuard: (guard: Guard) => void;
   setDriver: (driver: Driver) => void;
-  setOdometerResult: (photo: string, vehicle: Vehicle, odometerGuess: string) => void;
+  setVehicle: (vehicle: Vehicle) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string) => void;
   setOdometerGuess: (value: string) => void;
   setReturnCondition: (condition: ReturnCondition) => void;
   setRemarks: (value: string) => void;
@@ -51,7 +53,8 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
   setStep: (step) => set({ step }),
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
-  setOdometerResult: (odometerPhoto, vehicle, odometerGuess) => set({ odometerPhoto, vehicle, odometerGuess }),
+  setVehicle: (vehicle) => set({ vehicle }),
+  setOdometerCapture: (odometerPhoto, odometerGuess) => set({ odometerPhoto, odometerGuess }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
   setReturnCondition: (returnCondition) => set({ returnCondition }),
   setRemarks: (remarks) => set({ remarks }),

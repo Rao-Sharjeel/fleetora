@@ -5,7 +5,8 @@ import { ScanGuardPage } from "@/pages/scan-guard-page";
 import { GuardIdentifiedPage } from "@/pages/guard-identified-page";
 import { ScanDriverPage } from "@/pages/scan-driver-page";
 import { DriverIdentifiedPage } from "@/pages/driver-identified-page";
-import { CaptureOdometerQrPage } from "@/pages/capture-odometer-qr-page";
+import { ScanVehiclePage } from "@/pages/scan-vehicle-page";
+import { CaptureOdometerPage } from "@/pages/capture-odometer-page";
 import { ReadingExtractedPage } from "@/pages/reading-extracted-page";
 import { FuelDetailsPage } from "@/pages/fuel-details-page";
 import { ConfirmSavePage } from "@/pages/confirm-save-page";
@@ -17,7 +18,8 @@ const STEP_PAGES: Record<FuelStep, () => ReactElement | null> = {
   GUARD_IDENTIFIED: GuardIdentifiedPage,
   SCAN_DRIVER: ScanDriverPage,
   DRIVER_IDENTIFIED: DriverIdentifiedPage,
-  CAPTURE_ODOMETER_QR: CaptureOdometerQrPage,
+  SCAN_VEHICLE: ScanVehiclePage,
+  CAPTURE_ODOMETER: CaptureOdometerPage,
   READING_EXTRACTED: ReadingExtractedPage,
   FUEL_DETAILS: FuelDetailsPage,
   CONFIRM_SAVE: ConfirmSavePage,

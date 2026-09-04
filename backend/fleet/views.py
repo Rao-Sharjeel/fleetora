@@ -15,10 +15,12 @@ from fleet.serializers import (
     GateInSerializer,
     GateOutSerializer,
     GuardSerializer,
+    ReadOdometerSerializer,
     SetAllowedToExitSerializer,
     TripSerializer,
     VehicleSerializer,
 )
+from fleet.services import OdometerImageTooLarge, extract_odometer_reading
 
 # Collapses down to the 5 role-permission sets that already exist in src/App.tsx's
 # <RoleGuard allow={[...]}> lists — see accounts/permissions.py.
@@ -39,7 +41,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
     filterset_fields = ["status", "allowed_to_exit"]
 
     def get_permissions(self):
-        if self.action in ("by_code", "gate_in"):
+        if self.action in ("by_code", "gate_in", "read_odometer"):
             return [KIOSK_OR_GATE_STAFF()]
         if self.action in ("list", "retrieve"):
             # A gate_guard needs this for the "Currently Out" gate tile
@@ -56,6 +58,27 @@ class VehicleViewSet(viewsets.ModelViewSet):
         if not vehicle:
             return Response(status=404)
         return Response(VehicleSerializer(vehicle).data)
+
+    @action(detail=False, methods=["post"], url_path="read-odometer")
+    def read_odometer(self, request):
+        """OCRs a kiosk-captured odometer photo. No vehicle is known yet at this
+        point in the Exit/Entry/Fuel flow — the vehicle is only identified once
+        the QR code from the same photo is decoded client-side — so this is
+        vehicle-agnostic, unlike the other kiosk actions above.
+
+        confident=False means the kiosk must force a retake: there's no manual
+        digit-entry fallback in the kiosk UI, so a shaky OCR read can't be
+        allowed through as a guess.
+        """
+        serializer = ReadOdometerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            result = extract_odometer_reading(serializer.validated_data["image"])
+        except OdometerImageTooLarge as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return Response({"reading": result.reading, "confident": result.confident})
 
     @action(detail=True, methods=["post"], url_path="set-allowed-to-exit")
     def set_allowed_to_exit(self, request, pk=None):

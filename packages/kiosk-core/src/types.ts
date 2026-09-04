@@ -94,6 +94,11 @@ export interface FuelEntry extends CreateFuelEntryPayload {
   total: number;
 }
 
+export interface OdometerReadingResult {
+  reading: string | null;
+  confident: boolean;
+}
+
 export type AlertType = "maintenance" | "tyre" | "document" | "fuel_exception" | "overdue_return" | "gate_exception";
 export type AlertSeverity = "info" | "warning" | "critical";
 

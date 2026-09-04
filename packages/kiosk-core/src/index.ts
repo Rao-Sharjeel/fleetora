@@ -15,7 +15,7 @@ export { InstallBanner } from "./components/install-banner";
 export { useInstallPrompt } from "./hooks/use-install-prompt";
 
 export { decodeQr } from "./lib/barcode";
-export { recognizePlateText, recognizeOdometerDigits } from "./lib/ocr";
+export { recognizePlateText } from "./lib/ocr";
 export { formatTimestamp } from "./lib/format";
 export { normalizePlate, platesMatch } from "./lib/normalize";
 export { ApiError } from "./lib/api-client";
@@ -27,6 +27,7 @@ export {
   completeGateIn,
   createFuelEntry,
   createAlert,
+  readOdometerReading,
 } from "./lib/kiosk-api";
 
 export { useDeviceSession } from "./state/device-session";
@@ -45,4 +46,5 @@ export type {
   AlertType,
   AlertSeverity,
   CreateAlertPayload,
+  OdometerReadingResult,
 } from "./types";

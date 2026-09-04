@@ -7,7 +7,8 @@ import { ScanDriverPage } from "@/pages/scan-driver-page";
 import { DriverIdentifiedPage } from "@/pages/driver-identified-page";
 import { CaptureVehicleFrontPage } from "@/pages/capture-vehicle-front-page";
 import { FrontPhotoSavedPage } from "@/pages/front-photo-saved-page";
-import { CaptureOdometerQrPage } from "@/pages/capture-odometer-qr-page";
+import { ScanVehiclePage } from "@/pages/scan-vehicle-page";
+import { CaptureOdometerPage } from "@/pages/capture-odometer-page";
 import { ReadingExtractedPage } from "@/pages/reading-extracted-page";
 import { MismatchBlockedPage } from "@/pages/mismatch-blocked-page";
 import { NotAllowedBlockedPage } from "@/pages/not-allowed-blocked-page";
@@ -23,7 +24,8 @@ const STEP_PAGES: Record<ExitStep, () => ReactElement | null> = {
   DRIVER_IDENTIFIED: DriverIdentifiedPage,
   CAPTURE_FRONT: CaptureVehicleFrontPage,
   FRONT_SAVED: FrontPhotoSavedPage,
-  CAPTURE_ODOMETER_QR: CaptureOdometerQrPage,
+  SCAN_VEHICLE: ScanVehiclePage,
+  CAPTURE_ODOMETER: CaptureOdometerPage,
   READING_EXTRACTED: ReadingExtractedPage,
   MISMATCH_BLOCKED: MismatchBlockedPage,
   NOT_ALLOWED_BLOCKED: NotAllowedBlockedPage,

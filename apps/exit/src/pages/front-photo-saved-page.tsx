@@ -14,7 +14,7 @@ export function FrontPhotoSavedPage() {
     <KioskShell
       footer={
         <>
-          <PrimaryButton onClick={() => setStep("CAPTURE_ODOMETER_QR")}>Continue</PrimaryButton>
+          <PrimaryButton onClick={() => setStep("SCAN_VEHICLE")}>Continue</PrimaryButton>
           <button type="button" className="text-sm text-kiosk-blue" onClick={() => setStep("CAPTURE_FRONT")}>
             Retake
           </button>

@@ -19,7 +19,7 @@ export function ReadingExtractedPage() {
           <PrimaryButton disabled={!odometerValid} onClick={() => setStep("RETURN_CONDITION")}>
             Continue
           </PrimaryButton>
-          <button type="button" className="text-sm text-kiosk-blue" onClick={() => setStep("CAPTURE_ODOMETER_QR")}>
+          <button type="button" className="text-sm text-kiosk-blue" onClick={() => setStep("CAPTURE_ODOMETER")}>
             Retake
           </button>
         </>

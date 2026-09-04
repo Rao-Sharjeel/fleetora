@@ -9,7 +9,8 @@ export type ExitStep =
   | "DRIVER_IDENTIFIED"
   | "CAPTURE_FRONT"
   | "FRONT_SAVED"
-  | "CAPTURE_ODOMETER_QR"
+  | "SCAN_VEHICLE"
+  | "CAPTURE_ODOMETER"
   | "READING_EXTRACTED"
   | "MISMATCH_BLOCKED"
   | "NOT_ALLOWED_BLOCKED"
@@ -36,7 +37,8 @@ interface ExitSessionState {
   setDriver: (driver: Driver) => void;
   setFrontCapture: (photo: string, plateGuess: string) => void;
   setPlateGuess: (value: string) => void;
-  setOdometerResult: (photo: string, vehicle: Vehicle, odometerGuess: string) => void;
+  setVehicle: (vehicle: Vehicle) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string) => void;
   setOdometerGuess: (value: string) => void;
   setTrip: (trip: Trip) => void;
   setError: (message: string | undefined) => void;
@@ -58,7 +60,8 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
   setFrontCapture: (frontPhoto, plateGuess) => set({ frontPhoto, plateGuess, step: "FRONT_SAVED" }),
   setPlateGuess: (plateGuess) => set({ plateGuess }),
-  setOdometerResult: (odometerPhoto, vehicle, odometerGuess) => set({ odometerPhoto, vehicle, odometerGuess }),
+  setVehicle: (vehicle) => set({ vehicle }),
+  setOdometerCapture: (odometerPhoto, odometerGuess) => set({ odometerPhoto, odometerGuess }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
   setTrip: (trip) => set({ trip, step: "RECORD_SAVED" }),
   setError: (error) => set({ error }),

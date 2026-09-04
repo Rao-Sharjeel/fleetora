@@ -3,8 +3,12 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # libpq-dev + gcc: needed to build psycopg (django-tenants' Postgres backend).
+# tesseract-ocr: the actual OCR engine binary — pytesseract only wraps its CLI.
+# Deliberately not a deep-learning-framework-based OCR (PaddleOCR/docTR/etc.) —
+# those load a full neural-net runtime into memory per worker, and this droplet
+# has thin RAM margin (see the gunicorn CMD below).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/ requirements/

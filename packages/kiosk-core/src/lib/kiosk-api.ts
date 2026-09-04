@@ -8,6 +8,7 @@ import type {
   FuelEntry,
   Trip,
   CreateAlertPayload,
+  OdometerReadingResult,
 } from "../types";
 import { ApiError, apiGet, apiPost } from "./api-client";
 
@@ -47,6 +48,14 @@ export function completeGateIn(payload: GateInPayload): Promise<Trip> {
 
 export function createFuelEntry(payload: CreateFuelEntryPayload): Promise<FuelEntry> {
   return apiPost<FuelEntry>("/fuel-entries/", payload);
+}
+
+/** Server-side OCR of a captured odometer photo (see backend/fleet/services.py —
+ * deliberately plain Tesseract, not a deep-learning OCR, given the production
+ * droplet's thin RAM margin). `confident: false` means the kiosk should treat
+ * the reading as a rough guess, not a final answer. */
+export function readOdometerReading(imageDataUrl: string): Promise<OdometerReadingResult> {
+  return apiPost<OdometerReadingResult>("/vehicles/read-odometer/", { image: imageDataUrl });
 }
 
 export async function createAlert(payload: CreateAlertPayload): Promise<void> {

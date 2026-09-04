@@ -5,7 +5,8 @@ import { ScanGuardPage } from "@/pages/scan-guard-page";
 import { GuardIdentifiedPage } from "@/pages/guard-identified-page";
 import { ScanDriverPage } from "@/pages/scan-driver-page";
 import { DriverIdentifiedPage } from "@/pages/driver-identified-page";
-import { CaptureOdometerQrPage } from "@/pages/capture-odometer-qr-page";
+import { ScanVehiclePage } from "@/pages/scan-vehicle-page";
+import { CaptureOdometerPage } from "@/pages/capture-odometer-page";
 import { ReadingExtractedPage } from "@/pages/reading-extracted-page";
 import { NoOpenTripBlockedPage } from "@/pages/no-open-trip-blocked-page";
 import { ReturnConditionPage } from "@/pages/return-condition-page";
@@ -18,7 +19,8 @@ const STEP_PAGES: Record<EntryStep, () => ReactElement | null> = {
   GUARD_IDENTIFIED: GuardIdentifiedPage,
   SCAN_DRIVER: ScanDriverPage,
   DRIVER_IDENTIFIED: DriverIdentifiedPage,
-  CAPTURE_ODOMETER_QR: CaptureOdometerQrPage,
+  SCAN_VEHICLE: ScanVehiclePage,
+  CAPTURE_ODOMETER: CaptureOdometerPage,
   READING_EXTRACTED: ReadingExtractedPage,
   NO_OPEN_TRIP_BLOCKED: NoOpenTripBlockedPage,
   RETURN_CONDITION: ReturnConditionPage,

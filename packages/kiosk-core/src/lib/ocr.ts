@@ -16,14 +16,3 @@ export async function recognizePlateText(image: HTMLCanvasElement): Promise<stri
   return data.text.trim();
 }
 
-/** Digit-only OCR of the odometer photo. Always editable by the operator. */
-export async function recognizeOdometerDigits(image: HTMLCanvasElement): Promise<string> {
-  const worker = await getWorker();
-  await worker.setParameters({ tessedit_char_whitelist: "0123456789" });
-  try {
-    const { data } = await worker.recognize(image);
-    return data.text.replace(/[^0-9]/g, "");
-  } finally {
-    await worker.setParameters({ tessedit_char_whitelist: "" });
-  }
-}

@@ -7,7 +7,8 @@ export type FuelStep =
   | "GUARD_IDENTIFIED"
   | "SCAN_DRIVER"
   | "DRIVER_IDENTIFIED"
-  | "CAPTURE_ODOMETER_QR"
+  | "SCAN_VEHICLE"
+  | "CAPTURE_ODOMETER"
   | "READING_EXTRACTED"
   | "FUEL_DETAILS"
   | "CONFIRM_SAVE"
@@ -36,7 +37,8 @@ interface FuelSessionState {
   setStep: (step: FuelStep) => void;
   setGuard: (guard: Guard) => void;
   setDriver: (driver: Driver) => void;
-  setOdometerResult: (photo: string, vehicle: Vehicle, odometerGuess: string) => void;
+  setVehicle: (vehicle: Vehicle) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string) => void;
   setOdometerGuess: (value: string) => void;
   setDetails: (patch: Partial<FuelDetails>) => void;
   setEntry: (entry: FuelEntry) => void;
@@ -60,7 +62,8 @@ export const useFuelSession = create<FuelSessionState>((set) => ({
   setStep: (step) => set({ step }),
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
-  setOdometerResult: (odometerPhoto, vehicle, odometerGuess) => set({ odometerPhoto, vehicle, odometerGuess }),
+  setVehicle: (vehicle) => set({ vehicle }),
+  setOdometerCapture: (odometerPhoto, odometerGuess) => set({ odometerPhoto, odometerGuess }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
   setDetails: (patch) => set((state) => ({ details: { ...state.details, ...patch } })),
   setEntry: (entry) => set({ entry, step: "RECORD_SAVED" }),

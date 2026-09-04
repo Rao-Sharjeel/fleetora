@@ -1,3 +1,6 @@
+import base64
+import binascii
+
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -194,6 +197,23 @@ class SetAllowedToExitSerializer(serializers.Serializer):
                 "A reason is required when marking a vehicle not allowed to exit."
             )
         return attrs
+
+
+class ReadOdometerSerializer(serializers.Serializer):
+    """Input for VehicleViewSet.read_odometer — a base64 data URL or bare
+    base64 string of the captured (ideally already cropped) odometer photo."""
+
+    image = serializers.CharField()
+
+    def validate_image(self, value):
+        # Kiosk sends canvas.toDataURL() output, which includes the
+        # "data:image/jpeg;base64," prefix — strip it if present.
+        if "," in value and value.strip().lower().startswith("data:"):
+            value = value.split(",", 1)[1]
+        try:
+            return base64.b64decode(value, validate=True)
+        except (binascii.Error, ValueError):
+            raise serializers.ValidationError("Not valid base64 image data.")
 
 
 class GateOutSerializer(serializers.Serializer):

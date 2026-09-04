@@ -8,7 +8,7 @@ export function MismatchBlockedPage() {
   const setStep = useExitSession((s) => s.setStep);
 
   return (
-    <KioskShell footer={<PrimaryButton onClick={() => setStep("CAPTURE_ODOMETER_QR")}>Retake Photo</PrimaryButton>}>
+    <KioskShell footer={<PrimaryButton onClick={() => setStep("SCAN_VEHICLE")}>Rescan Vehicle QR</PrimaryButton>}>
       <BlockedBadge label="Vehicle Mismatch" />
       <div className="rounded-2xl border border-kiosk-border bg-kiosk-panel p-4 text-sm text-kiosk-muted">
         <p>
