@@ -1,0 +1,10 @@
+.venv
+.pgdata
+media
+staticfiles
+__pycache__
+**/__pycache__
+**/*.pyc
+.env
+.env.production
+.env.example
