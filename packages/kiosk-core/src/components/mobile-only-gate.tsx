@@ -12,7 +12,8 @@ export function MobileOnlyGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-dvh w-full flex-col items-center justify-center gap-4 bg-kiosk-bg px-6 text-center text-kiosk-text">
         <div className="flex flex-col items-center gap-1">
-          <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-8 w-auto object-contain" />
+          {/* <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-8 w-auto object-contain" /> */}
+          <img src="/drive-logo.png" alt="D-RIVE" className="h-8 w-auto object-contain" />
           <span className="text-lg font-extrabold tracking-tight text-kiosk-accent">{getKioskConfig().wordmark}</span>
         </div>
         <Smartphone className="h-8 w-8 text-kiosk-muted" />

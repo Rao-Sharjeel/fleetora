@@ -21,7 +21,8 @@ export function AppShell() {
     <div className="flex h-svh w-full overflow-hidden bg-background">
       <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <div className="flex h-16 items-center px-5">
-          <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-11 w-auto max-w-full object-contain" />
+          {/* <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-11 w-auto max-w-full object-contain" /> */}
+          <img src="/drive-logo.png" alt="D-RIVE" className="h-11 w-auto max-w-full object-contain" />
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-2">
           {navItems.map((item) => (

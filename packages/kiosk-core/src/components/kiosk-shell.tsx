@@ -21,7 +21,8 @@ export function KioskShell({ onBack, children, footer }: KioskShellProps) {
           <span className="w-5" />
         )}
         <div className="flex items-center gap-1.5">
-          <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-4 w-auto object-contain" />
+          {/* <img src="/fleetora-wordmark.png" alt="Fleetora" className="h-4 w-auto object-contain" /> */}
+          <img src="/drive-logo.png" alt="D-RIVE" className="h-4 w-auto object-contain" />
           <span className="text-sm font-extrabold tracking-wide text-kiosk-accent">{getKioskConfig().wordmark}</span>
         </div>
       </header>

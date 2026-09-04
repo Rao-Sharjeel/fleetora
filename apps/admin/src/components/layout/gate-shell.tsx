@@ -14,7 +14,8 @@ export function GateShell() {
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 text-sidebar-foreground">
         <div className="flex items-center gap-2.5">
-          <img src="/fleetora-logo.png" alt="Fleetora" className="h-8 w-auto object-contain" />
+          {/* <img src="/fleetora-logo.png" alt="Fleetora" className="h-8 w-auto object-contain" /> */}
+          <img src="/drive-logo.png" alt="D-RIVE" className="h-8 w-auto object-contain" />
           <span className="text-xs font-medium uppercase tracking-wide text-sidebar-muted-foreground">
             Gate Control
           </span>

@@ -19,7 +19,8 @@ export function SplashScreen({ wordmark, onBegin }: SplashScreenProps) {
     >
       <div />
       <div className="flex flex-col items-center gap-3">
-        <img src="/fleetora-logo.png" alt="Fleetora" className="h-auto w-[78%] max-w-[320px] object-contain" />
+        {/* <img src="/fleetora-logo.png" alt="Fleetora" className="h-auto w-[78%] max-w-[320px] object-contain" /> */}
+        <img src="/drive-logo.png" alt="D-RIVE" className="h-auto w-[78%] max-w-[320px] object-contain" />
         <span className="text-4xl font-extrabold tracking-tight text-kiosk-accent">{wordmark}</span>
       </div>
       <div className="flex w-full flex-col items-center gap-3">

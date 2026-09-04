@@ -56,7 +56,8 @@ export function LoginPage() {
       <div className="fx-scrim-mobile" aria-hidden />
 
       <header className="fx-brand">
-        <img className="fx-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" />
+        {/* <img className="fx-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" /> */}
+        <img className="fx-wordmark" src="/drive-logo.png" alt="D-RIVE" />
         <p className="fx-brand-sub">Intelligent Fleet Management System</p>
         <p className="fx-powered">
           powered by
@@ -75,7 +76,8 @@ export function LoginPage() {
           </div>
 
           <div className="fx-panel-brand">
-            <img className="fx-panel-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" />
+            {/* <img className="fx-panel-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" /> */}
+            <img className="fx-panel-wordmark" src="/drive-logo.png" alt="D-RIVE" />
           </div>
 
           <p className="fx-eyebrow">Fleet operations console</p>
