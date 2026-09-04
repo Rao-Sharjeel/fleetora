@@ -8,7 +8,7 @@ from tenants.models import SuperAdmin
 class Command(BaseCommand):
     """Bootstraps the first Super Admin — there's no API for this (chicken-and-egg:
     creating a super admin via the API requires already being one), same reason
-    Django's own createsuperuser and accounts' create_tenant_superuser are CLI-only."""
+    Django's own createsuperuser and accounts' create_tenant_admin are CLI-only."""
 
     help = "Creates a Super Admin account."
 

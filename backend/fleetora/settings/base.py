@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -19,26 +20,38 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-dev-only-change-m
 
 # --- django-tenants: schema-per-tenant multi-tenancy -----------------------
 # SHARED_APPS live in the public schema (shared across every tenant).
-# TENANT_APPS get one fully separate copy of their tables per tenant schema,
-# including auth — each tenant's users are invisible even at the DB level to
-# every other tenant.
+# TENANT_APPS get one fully separate copy of their tables per tenant schema.
+#
+# accounts (User, KioskDevice) lives in SHARED_APPS, not TENANT_APPS: identity
+# is a single platform-wide table with a `tenant` FK column (user-based
+# multi-tenancy — one login domain, the user's own row says which tenant they
+# belong to), not one separate copy per schema. django.contrib.auth/admin/sessions
+# come along with it: accounts.User inherits groups/user_permissions M2M fields
+# from AbstractUser, whose through-tables FK into auth_group/auth_permission —
+# those must exist in the same (public) schema or the migration fails outright.
+#
+# Everything else (fleet, maintenance, documents, ...) stays a TENANT_APP —
+# that's where the isolation guarantee actually matters (a company's vehicles,
+# trips, fuel history), and schema separation keeps protecting it exactly as
+# before. Losing schema-level isolation only applies to accounts' own models;
+# see accounts/views.py's tenant-filtered querysets for how that's enforced instead.
 SHARED_APPS = [
     "django_tenants",
     "tenants",
     "django.contrib.contenttypes",
-]
-
-TENANT_APPS = [
     "django.contrib.auth",
     "django.contrib.admin",
     "django.contrib.sessions",
+    "accounts",
+]
+
+TENANT_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
     "django_filters",
-    "accounts",
     "fleet",
     "maintenance",
     "documents",
@@ -54,10 +67,12 @@ INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in S
 TENANT_MODEL = "tenants.Tenant"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = "public"
-# Used only when a request resolves to the public tenant itself (the Super Admin
-# API/dashboard's domain — see bootstrap_public_tenant) — every other host keeps
-# using ROOT_URLCONF (fleetora.urls) unchanged.
-PUBLIC_SCHEMA_URLCONF = "fleetora.urls_public"
+# No PUBLIC_SCHEMA_URLCONF: with user-based multi-tenancy there's exactly one
+# login domain for everyone (see bootstrap_public_tenant), always resolving to
+# the public schema — so there's nothing left for a *second* urlconf to
+# differentiate. Every route lives in ROOT_URLCONF (fleetora.urls); which ones
+# are super-admin-only vs. tenant-user-only is enforced by each view's own
+# authentication/permission classes instead (see tenants.permissions.IsSuperAdmin).
 
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 
@@ -103,6 +118,11 @@ DATABASES = {
     }
 }
 
+# Both dev and prod need this — the kiosk apps authenticate via this custom
+# header, which isn't in corsheaders' default allow-list. Lives here (not just
+# dev.py) so prod.py inherits it automatically instead of needing its own copy.
+CORS_ALLOW_HEADERS = [*default_headers, "x-kiosk-api-key"]
+
 AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -126,7 +146,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "accounts.authentication.TenantAwareJWTAuthentication",
         "accounts.authentication.KioskDeviceAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],

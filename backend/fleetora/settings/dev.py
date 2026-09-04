@@ -1,5 +1,3 @@
-from corsheaders.defaults import default_headers
-
 from .base import *  # noqa: F401,F403
 from .base import env
 
@@ -22,5 +20,3 @@ CORS_ALLOWED_ORIGINS = env.list(
     ],
 )
 CORS_ALLOW_CREDENTIALS = True
-# The kiosk apps authenticate via this custom header — not in corsheaders' default list.
-CORS_ALLOW_HEADERS = [*default_headers, "x-kiosk-api-key"]
