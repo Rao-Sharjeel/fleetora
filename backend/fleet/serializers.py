@@ -119,6 +119,7 @@ class GuardSerializer(serializers.ModelSerializer):
             "id",
             "guard_id",
             "name",
+            "company_id_code",
             "cnic",
             "mobile",
             "department",

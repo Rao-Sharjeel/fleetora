@@ -44,6 +44,7 @@ const DRIVER_SECTIONS: FormModalSection[] = [
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
+  companyIdCode: z.string().min(1, "Required"),
   cnic: z.string().min(1, "Required"),
   mobile: z.string().min(1, "Required"),
   licenceNumber: z.string().min(1, "Required"),
@@ -68,6 +69,7 @@ type FormValues = z.infer<typeof schema>;
 
 const columns: ColumnDef<Driver>[] = [
   { accessorKey: "employeeId", header: "Employee ID" },
+  { accessorKey: "companyIdCode", header: "Company ID" },
   { accessorKey: "name", header: "Name" },
   { accessorKey: "department", header: "Department" },
   { accessorKey: "mobile", header: "Mobile" },
@@ -117,6 +119,7 @@ export function DriversListPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       name: "",
+      companyIdCode: "",
       cnic: "",
       mobile: "",
       licenceNumber: "",
@@ -184,6 +187,9 @@ export function DriversListPage() {
                     >
                       <FormField label="Full Name" error={form.formState.errors.name?.message}>
                         <Input {...form.register("name")} placeholder="e.g. Muhammad Aslam" />
+                      </FormField>
+                      <FormField label="Company ID" error={form.formState.errors.companyIdCode?.message}>
+                        <Input {...form.register("companyIdCode")} placeholder="e.g. CMP-1027" />
                       </FormField>
                       <FormField label="CNIC" error={form.formState.errors.cnic?.message}>
                         <Input {...form.register("cnic")} placeholder="e.g. 35201-1234567-1" />

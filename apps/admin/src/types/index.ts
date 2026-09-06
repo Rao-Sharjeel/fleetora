@@ -57,7 +57,7 @@ export interface Driver {
   employeeId: string;
   name: string;
   photoUrl?: string;
-  companyIdCode?: string;
+  companyIdCode: string;
   cnic: string;
   mobile: string;
   licenceNumber: string;
@@ -333,6 +333,7 @@ export interface Guard {
   id: string;
   guardId: string;
   name: string;
+  companyIdCode: string;
   cnic: string;
   mobile: string;
   department?: string;

@@ -21,7 +21,7 @@ class Driver(models.Model):
     employee_id = models.CharField(max_length=20, unique=True, editable=False)
     name = models.CharField(max_length=120)
     photo = models.ImageField(upload_to="drivers/", null=True, blank=True)
-    company_id_code = models.CharField(max_length=40, blank=True, default="")
+    company_id_code = models.CharField(max_length=40, unique=True)
     cnic = models.CharField(max_length=20)
     mobile = models.CharField(max_length=20)
     licence_number = models.CharField(max_length=40)
@@ -62,6 +62,7 @@ class Guard(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     guard_id = models.CharField(max_length=20, unique=True)  # user-supplied at creation, not generated
     name = models.CharField(max_length=120)
+    company_id_code = models.CharField(max_length=40, unique=True)
     cnic = models.CharField(max_length=20)
     mobile = models.CharField(max_length=20)
     department = models.CharField(max_length=120, blank=True, default="")
