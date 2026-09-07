@@ -158,14 +158,18 @@ export function DriversListPage() {
 
   async function onSubmit(values: FormValues) {
     const { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed, ...rest } = values;
-    await createDriver.mutateAsync({
-      ...rest,
-      assignedVehicleId: values.assignedVehicleId || undefined,
-      otherDetails: { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed },
-    });
-    toast.success(`${values.name} added as a driver.`);
-    form.reset();
-    setOpen(false);
+    try {
+      await createDriver.mutateAsync({
+        ...rest,
+        assignedVehicleId: values.assignedVehicleId || undefined,
+        otherDetails: { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed },
+      });
+      toast.success(`${values.name} added as a driver.`);
+      form.reset();
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add driver.");
+    }
   }
 
   return (

@@ -124,10 +124,14 @@ export function GuardsListPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    await createGuard.mutateAsync(values);
-    toast.success(`${values.name} added as a security guard.`);
-    form.reset();
-    setOpen(false);
+    try {
+      await createGuard.mutateAsync(values);
+      toast.success(`${values.name} added as a security guard.`);
+      form.reset();
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add guard.");
+    }
   }
 
   return (
