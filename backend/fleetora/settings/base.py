@@ -43,6 +43,7 @@ SHARED_APPS = [
     "django.contrib.admin",
     "django.contrib.sessions",
     "accounts",
+    "storages",
 ]
 
 TENANT_APPS = [
@@ -73,6 +74,13 @@ PUBLIC_SCHEMA_NAME = "public"
 # differentiate. Every route lives in ROOT_URLCONF (fleetora.urls); which ones
 # are super-admin-only vs. tenant-user-only is enforced by each view's own
 # authentication/permission classes instead (see tenants.permissions.IsSuperAdmin).
+#
+# That "one login domain" only works if TenantMainMiddleware actually lets an
+# unmatched hostname (the login domain itself has no per-tenant Domain row —
+# there's nothing to route it to) through to the public schema instead of
+# 404ing. TenantAwareJWTAuthentication/KioskDeviceAuthentication then move the
+# connection to the right tenant schema once the user/device is resolved.
+SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
 DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 
@@ -139,8 +147,30 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# --- Media storage: Backblaze B2 (S3-compatible) ----------------------------
+# Driver/guard photos etc. live in one shared B2 bucket rather than on local
+# disk — needed once the app runs on more than one server, and avoids the
+# "which server's disk is this file actually on" problem entirely. The bucket
+# is private with no per-object ACLs (B2 doesn't support them), so
+# S3Boto3Storage.url() returns a presigned URL good for AWS_QUERYSTRING_EXPIRE
+# seconds — that's what DriverSerializer/GuardSerializer's photo_url exposes.
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+AWS_S3_ACCESS_KEY_ID = env("B2_KEY_ID", default="")
+AWS_S3_SECRET_ACCESS_KEY = env("B2_APPLICATION_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("B2_BUCKET_NAME", default="drive-media")
+AWS_S3_REGION_NAME = env("B2_REGION_NAME", default="eu-central-003")
+AWS_S3_ENDPOINT_URL = env("B2_ENDPOINT_URL", default=f"https://s3.{AWS_S3_REGION_NAME}.backblazeb2.com")
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_EXPIRE = 3600
+AWS_S3_FILE_OVERWRITE = False
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

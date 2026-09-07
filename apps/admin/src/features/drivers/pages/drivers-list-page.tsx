@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { FormField } from "@/components/shared/form-field";
+import { PhotoCapture } from "@/components/shared/photo-capture";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { printStaffIdCard } from "@/lib/qr-print";
 import { Input } from "@/components/ui/input";
@@ -31,7 +33,7 @@ import { useMasterCollection } from "@/features/master-data/hooks";
 import { licenceStatus } from "@/services/drivers.service";
 import type { Driver } from "@/types";
 import { formatDate } from "@/lib/formatters";
-import { emptyToUndefined, emptyStringToUndefined } from "@/lib/utils";
+import { emptyToUndefined, emptyStringToUndefined, fileToDataUrl } from "@/lib/utils";
 
 const GENDERS: NonNullable<Driver["gender"]>[] = ["Male", "Female", "Other"];
 
@@ -44,6 +46,7 @@ const DRIVER_SECTIONS: FormModalSection[] = [
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
+  photoUrl: z.string().optional(),
   companyIdCode: z.string().min(1, "Required"),
   cnic: z.string().min(1, "Required"),
   mobile: z.string().min(1, "Required"),
@@ -68,6 +71,16 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const columns: ColumnDef<Driver>[] = [
+  {
+    id: "photo",
+    header: "",
+    cell: ({ row }) => (
+      <Avatar>
+        <AvatarImage src={row.original.photoUrl} alt={row.original.name} />
+        <AvatarFallback>{row.original.name.charAt(0).toUpperCase()}</AvatarFallback>
+      </Avatar>
+    ),
+  },
   { accessorKey: "employeeId", header: "Employee ID" },
   { accessorKey: "companyIdCode", header: "Company ID" },
   { accessorKey: "name", header: "Name" },
@@ -119,6 +132,7 @@ export function DriversListPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       name: "",
+      photoUrl: undefined,
       companyIdCode: "",
       cnic: "",
       mobile: "",
@@ -185,6 +199,10 @@ export function DriversListPage() {
                       title="Personal Information"
                       description="Identity and contact details."
                     >
+                      <PhotoCapture
+                        label="Driver Photo"
+                        onCapture={async (file) => form.setValue("photoUrl", await fileToDataUrl(file))}
+                      />
                       <FormField label="Full Name" error={form.formState.errors.name?.message}>
                         <Input {...form.register("name")} placeholder="e.g. Muhammad Aslam" />
                       </FormField>

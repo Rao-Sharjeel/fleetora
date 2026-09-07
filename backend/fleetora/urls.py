@@ -1,5 +1,3 @@
-from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -23,8 +21,6 @@ urlpatterns = [
     path("api/platform/", include("tenants.urls")),
 ]
 
-# Driver/guard/vehicle photos (fleet/models.py) save to MEDIA_ROOT, but nothing
-# served MEDIA_URL back out — not even here in DEBUG. In production this same
-# job is done by the reverse proxy serving MEDIA_ROOT directly, not by Django.
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Driver/guard/vehicle photos (fleet/models.py) are stored in Backblaze B2, not
+# on local disk — their serializer URLs point straight at B2, so Django never
+# serves media files itself in any environment.

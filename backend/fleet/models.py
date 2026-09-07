@@ -1,10 +1,20 @@
 import uuid
 
 from django.conf import settings
-from django.db import models
+from django.db import connection, models
 from django.utils import timezone
 
 from common.models import Sequence
+
+
+def driver_photo_path(instance, filename):
+    # B2 is one shared bucket across every tenant — prefix by schema so
+    # tenants' photos can never collide or be listed together.
+    return f"drivers/{connection.schema_name}/{instance.id}/{filename}"
+
+
+def guard_photo_path(instance, filename):
+    return f"guards/{connection.schema_name}/{instance.id}/{filename}"
 
 
 class Driver(models.Model):
@@ -20,7 +30,7 @@ class Driver(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     employee_id = models.CharField(max_length=20, unique=True, editable=False)
     name = models.CharField(max_length=120)
-    photo = models.ImageField(upload_to="drivers/", null=True, blank=True)
+    photo = models.ImageField(upload_to=driver_photo_path, null=True, blank=True)
     company_id_code = models.CharField(max_length=40, unique=True)
     cnic = models.CharField(max_length=20)
     mobile = models.CharField(max_length=20)
@@ -74,7 +84,7 @@ class Guard(models.Model):
     authorized_exit = models.BooleanField(default=True)
     authorized_in = models.BooleanField(default=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
-    photo = models.ImageField(upload_to="guards/", null=True, blank=True)
+    photo = models.ImageField(upload_to=guard_photo_path, null=True, blank=True)
 
     def __str__(self) -> str:
         return f"{self.guard_id} — {self.name}"

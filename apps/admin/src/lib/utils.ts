@@ -19,3 +19,15 @@ export function emptyToUndefined(value: string): number | undefined {
 export function emptyStringToUndefined(value: string): string | undefined {
   return value === "" ? undefined : value;
 }
+
+// Backend photo fields accept a base64 data URL in place of a multipart upload
+// (see Base64ImageField) — this reads the file the same way PhotoCapture hands
+// it back and turns it into that string.
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}

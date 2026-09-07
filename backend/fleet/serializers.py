@@ -4,6 +4,7 @@ import binascii
 from django.utils import timezone
 from rest_framework import serializers
 
+from common.serializers import Base64ImageField
 from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle
 from masterdata.models import GateMaster
 
@@ -73,7 +74,7 @@ class DriverSerializer(serializers.ModelSerializer):
     assigned_vehicle_id = serializers.PrimaryKeyRelatedField(
         source="assigned_vehicle", queryset=Vehicle.objects.all(), required=False, allow_null=True
     )
-    photo_url = serializers.ImageField(source="photo", required=False, allow_null=True)
+    photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
 
     class Meta:
         model = Driver
@@ -108,7 +109,7 @@ class DriverSerializer(serializers.ModelSerializer):
 
 
 class GuardSerializer(serializers.ModelSerializer):
-    photo_url = serializers.ImageField(source="photo", required=False, allow_null=True)
+    photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
     assigned_gate_id = serializers.PrimaryKeyRelatedField(
         source="assigned_gate", queryset=GateMaster.objects.all(), required=False, allow_null=True
     )

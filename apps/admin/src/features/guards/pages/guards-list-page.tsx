@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { FormField } from "@/components/shared/form-field";
+import { PhotoCapture } from "@/components/shared/photo-capture";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { printStaffIdCard } from "@/lib/qr-print";
@@ -26,10 +28,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateGuard, useGuards } from "@/features/guards/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
 import type { Guard } from "@/types";
+import { fileToDataUrl } from "@/lib/utils";
 
 const schema = z.object({
   guardId: z.string().min(1, "Required"),
   name: z.string().min(1, "Required"),
+  photoUrl: z.string().optional(),
   companyIdCode: z.string().min(1, "Required"),
   cnic: z.string().min(1, "Required"),
   mobile: z.string().min(1, "Required"),
@@ -43,6 +47,16 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 const columns: ColumnDef<Guard>[] = [
+  {
+    id: "photo",
+    header: "",
+    cell: ({ row }) => (
+      <Avatar>
+        <AvatarImage src={row.original.photoUrl} alt={row.original.name} />
+        <AvatarFallback>{row.original.name.charAt(0).toUpperCase()}</AvatarFallback>
+      </Avatar>
+    ),
+  },
   { accessorKey: "guardId", header: "Guard ID" },
   { accessorKey: "companyIdCode", header: "Company ID" },
   { accessorKey: "name", header: "Name" },
@@ -96,6 +110,7 @@ export function GuardsListPage() {
     defaultValues: {
       guardId: "",
       name: "",
+      photoUrl: undefined,
       companyIdCode: "",
       cnic: "",
       mobile: "",
@@ -133,6 +148,11 @@ export function GuardsListPage() {
               </DialogHeader>
               <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <PhotoCapture
+                    label="Guard Photo"
+                    className="sm:col-span-2"
+                    onCapture={async (file) => form.setValue("photoUrl", await fileToDataUrl(file))}
+                  />
                   <FormField label="Guard ID / Code" error={form.formState.errors.guardId?.message}>
                     <Input {...form.register("guardId")} placeholder="e.g. GRD-1027" />
                   </FormField>
