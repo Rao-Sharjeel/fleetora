@@ -53,7 +53,7 @@ const columns: ColumnDef<Driver>[] = [
             id: row.original.employeeId,
             name: row.original.name,
             role: "Driver",
-            department: row.original.department,
+            photoUrl: row.original.photoUrl,
           });
         }}
       >

@@ -53,7 +53,7 @@ const columns: ColumnDef<Guard>[] = [
             id: row.original.guardId,
             name: row.original.name,
             role: row.original.guardType,
-            department: row.original.department,
+            photoUrl: row.original.photoUrl,
           });
         }}
       >
