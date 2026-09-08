@@ -81,20 +81,31 @@ export function GuardProfilePage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoCard title="Company ID" value={guard.companyIdCode} />
-            <InfoCard title="CNIC" value={guard.cnic} />
-            <InfoCard title="Mobile" value={guard.mobile} />
-            <InfoCard title="Guard Type" value={guard.guardType} />
-            {guard.department && <InfoCard title="Department" value={guard.department} />}
-            {guard.dutyShift && <InfoCard title="Duty Shift" value={guard.dutyShift} />}
-            <InfoCard title="Assigned Gate" value={assignedGate?.name ?? "Unassigned"} />
-            <InfoCard
-              title="Gate Authorization"
-              value={
-                [guard.authorizedExit && "Exit", guard.authorizedIn && "In"].filter(Boolean).join(" / ") || "None"
-              }
-            />
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="h-48 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+              {guard.photoUrl ? (
+                <img src={guard.photoUrl} alt={guard.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-muted-foreground">
+                  {guard.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoCard title="Company ID" value={guard.companyIdCode} />
+              <InfoCard title="CNIC" value={guard.cnic} />
+              <InfoCard title="Mobile" value={guard.mobile} />
+              <InfoCard title="Guard Type" value={guard.guardType} />
+              {guard.department && <InfoCard title="Department" value={guard.department} />}
+              {guard.dutyShift && <InfoCard title="Duty Shift" value={guard.dutyShift} />}
+              <InfoCard title="Assigned Gate" value={assignedGate?.name ?? "Unassigned"} />
+              <InfoCard
+                title="Gate Authorization"
+                value={
+                  [guard.authorizedExit && "Exit", guard.authorizedIn && "In"].filter(Boolean).join(" / ") || "None"
+                }
+              />
+            </div>
           </div>
         </TabsContent>
 

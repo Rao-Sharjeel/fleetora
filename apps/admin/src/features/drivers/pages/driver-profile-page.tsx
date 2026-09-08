@@ -94,40 +94,51 @@ export function DriverProfilePage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoCard title="Company ID" value={driver.companyIdCode} />
-            <InfoCard title="CNIC" value={driver.cnic} />
-            <InfoCard title="Mobile" value={driver.mobile} />
-            <InfoCard title="Licence Category" value={driver.licenceCategory} />
-            <InfoCard title="Licence Expiry" value={formatDate(driver.licenceExpiry)} />
-            <InfoCard title="Licence Status" value={licenceStatus(driver.licenceExpiry).replace("_", " ")} />
-            <InfoCard
-              title="Assigned Vehicle"
-              value={assignedVehicle ? `${assignedVehicle.registrationNumber} · ${assignedVehicle.make} ${assignedVehicle.model}` : "Unassigned"}
-            />
-            {driver.emergencyContact && <InfoCard title="Emergency Contact" value={driver.emergencyContact} />}
-            {driver.fatherHusbandName && <InfoCard title="Father / Husband Name" value={driver.fatherHusbandName} />}
-            {driver.dateOfBirth && <InfoCard title="Date of Birth" value={formatDate(driver.dateOfBirth)} />}
-            {driver.gender && <InfoCard title="Gender" value={driver.gender} />}
-            {driver.residentialAddress && <InfoCard title="Residential Address" value={driver.residentialAddress} />}
-            {driver.dateOfJoining && <InfoCard title="Date of Joining" value={formatDate(driver.dateOfJoining)} />}
-            {driver.totalExperienceYears != null && (
-              <InfoCard title="Driving Experience" value={`${driver.totalExperienceYears} years`} />
-            )}
-            {driver.accessLevel && <InfoCard title="Access Level" value={driver.accessLevel} />}
-            <InfoCard
-              title="Equipment Issued"
-              value={
-                [
-                  driver.otherDetails?.uniformIssued && "Uniform",
-                  driver.otherDetails?.idCardIssued && "ID Card",
-                  driver.otherDetails?.rfidAccessCard && "RFID Card",
-                  driver.otherDetails?.nightDutyAllowed && "Night Duty",
-                ]
-                  .filter(Boolean)
-                  .join(", ") || "None"
-              }
-            />
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="h-48 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+              {driver.photoUrl ? (
+                <img src={driver.photoUrl} alt={driver.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-muted-foreground">
+                  {driver.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoCard title="Company ID" value={driver.companyIdCode} />
+              <InfoCard title="CNIC" value={driver.cnic} />
+              <InfoCard title="Mobile" value={driver.mobile} />
+              <InfoCard title="Licence Category" value={driver.licenceCategory} />
+              <InfoCard title="Licence Expiry" value={formatDate(driver.licenceExpiry)} />
+              <InfoCard title="Licence Status" value={licenceStatus(driver.licenceExpiry).replace("_", " ")} />
+              <InfoCard
+                title="Assigned Vehicle"
+                value={assignedVehicle ? `${assignedVehicle.registrationNumber} · ${assignedVehicle.make} ${assignedVehicle.model}` : "Unassigned"}
+              />
+              {driver.emergencyContact && <InfoCard title="Emergency Contact" value={driver.emergencyContact} />}
+              {driver.fatherHusbandName && <InfoCard title="Father / Husband Name" value={driver.fatherHusbandName} />}
+              {driver.dateOfBirth && <InfoCard title="Date of Birth" value={formatDate(driver.dateOfBirth)} />}
+              {driver.gender && <InfoCard title="Gender" value={driver.gender} />}
+              {driver.residentialAddress && <InfoCard title="Residential Address" value={driver.residentialAddress} />}
+              {driver.dateOfJoining && <InfoCard title="Date of Joining" value={formatDate(driver.dateOfJoining)} />}
+              {driver.totalExperienceYears != null && (
+                <InfoCard title="Driving Experience" value={`${driver.totalExperienceYears} years`} />
+              )}
+              {driver.accessLevel && <InfoCard title="Access Level" value={driver.accessLevel} />}
+              <InfoCard
+                title="Equipment Issued"
+                value={
+                  [
+                    driver.otherDetails?.uniformIssued && "Uniform",
+                    driver.otherDetails?.idCardIssued && "ID Card",
+                    driver.otherDetails?.rfidAccessCard && "RFID Card",
+                    driver.otherDetails?.nightDutyAllowed && "Night Duty",
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "None"
+                }
+              />
+            </div>
           </div>
         </TabsContent>
 

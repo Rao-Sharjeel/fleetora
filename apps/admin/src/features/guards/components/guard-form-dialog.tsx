@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
-import { PhotoCapture } from "@/components/shared/photo-capture";
+import { PersonPhotoCapture } from "@/components/shared/person-photo-capture";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,7 +138,7 @@ export function GuardFormDialog({ mode, guard }: GuardFormDialogProps) {
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <PhotoCapture
+            <PersonPhotoCapture
               label="Guard Photo"
               className="sm:col-span-2"
               initialPreviewUrl={guard?.photoUrl}

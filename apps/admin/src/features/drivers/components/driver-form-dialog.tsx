@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Pencil, Plus, User, BadgeCheck, Car, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
-import { PhotoCapture } from "@/components/shared/photo-capture";
+import { PersonPhotoCapture } from "@/components/shared/person-photo-capture";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -206,7 +206,7 @@ export function DriverFormDialog({ mode, driver }: DriverFormDialogProps) {
                 title="Personal Information"
                 description="Identity and contact details."
               >
-                <PhotoCapture
+                <PersonPhotoCapture
                   label="Driver Photo"
                   initialPreviewUrl={driver?.photoUrl}
                   onCapture={async (file) => form.setValue("photoUrl", await fileToDataUrl(file))}
