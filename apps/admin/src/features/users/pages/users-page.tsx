@@ -58,23 +58,30 @@ export function UsersPage() {
   }
 
   async function onSubmit(values: FormValues) {
-    if (editingId) {
-      const { password, ...rest } = values;
-      await updateUser.mutateAsync({ id: editingId, patch: password ? values : rest });
-      toast.success("User updated.");
-    } else {
-      if (!values.password) {
-        form.setError("password", { message: "Required" });
-        return;
+    try {
+      if (editingId) {
+        const { password, ...rest } = values;
+        await updateUser.mutateAsync({ id: editingId, patch: password ? values : rest });
+        toast.success("User updated.");
+      } else {
+        if (!values.password) {
+          form.setError("password", { message: "Required" });
+          return;
+        }
+        await createUser.mutateAsync({ ...values, password: values.password });
+        toast.success(`${values.name} added.`);
       }
-      await createUser.mutateAsync({ ...values, password: values.password });
-      toast.success(`${values.name} added.`);
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save user.");
     }
-    setOpen(false);
   }
 
   function toggleActive(user: AppUser, checked: boolean) {
-    updateUser.mutate({ id: user.id, patch: { active: checked } });
+    updateUser.mutate(
+      { id: user.id, patch: { active: checked } },
+      { onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update status.") },
+    );
   }
 
   const columns: ColumnDef<AppUser>[] = [

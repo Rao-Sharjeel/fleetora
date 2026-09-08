@@ -50,25 +50,29 @@ export function MaintenancePage() {
       toast.error("Please complete vehicle, odometer, workshop, at least one category and cost.");
       return;
     }
-    await createRecord.mutateAsync({
-      vehicleId,
-      date: new Date().toISOString().slice(0, 10),
-      odometer: Number(odometer),
-      workshop,
-      categories,
-      totalCost: Number(totalCost),
-      nextDueOdometer: nextDueOdometer ? Number(nextDueOdometer) : undefined,
-      remarks: remarks || undefined,
-    });
-    toast.success("Maintenance record saved.");
-    setVehicleId("");
-    setOdometer("");
-    setWorkshop("");
-    setCategories([]);
-    setTotalCost("");
-    setNextDueOdometer("");
-    setRemarks("");
-    setOpen(false);
+    try {
+      await createRecord.mutateAsync({
+        vehicleId,
+        date: new Date().toISOString().slice(0, 10),
+        odometer: Number(odometer),
+        workshop,
+        categories,
+        totalCost: Number(totalCost),
+        nextDueOdometer: nextDueOdometer ? Number(nextDueOdometer) : undefined,
+        remarks: remarks || undefined,
+      });
+      toast.success("Maintenance record saved.");
+      setVehicleId("");
+      setOdometer("");
+      setWorkshop("");
+      setCategories([]);
+      setTotalCost("");
+      setNextDueOdometer("");
+      setRemarks("");
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save maintenance record.");
+    }
   }
 
   return (

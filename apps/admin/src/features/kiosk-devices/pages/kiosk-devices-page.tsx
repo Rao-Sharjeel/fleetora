@@ -43,20 +43,29 @@ export function KioskDevicesPage() {
   }
 
   async function onSubmit(values: FormValues) {
-    const device = await createDevice.mutateAsync(values.name);
-    setOpen(false);
-    setIssuedKey({ name: device.name, apiKey: device.apiKey });
+    try {
+      const device = await createDevice.mutateAsync(values.name);
+      setOpen(false);
+      setIssuedKey({ name: device.name, apiKey: device.apiKey });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add device.");
+    }
   }
 
   function toggleActive(device: KioskDevice, checked: boolean) {
-    updateDevice.mutate({ id: device.id, patch: { active: checked } });
+    updateDevice.mutate(
+      { id: device.id, patch: { active: checked } },
+      { onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update status.") },
+    );
   }
 
   function handleDelete(device: KioskDevice) {
     if (!window.confirm(`Delete "${device.name}"? This can't be undone — the device will need a new key to pair again.`)) {
       return;
     }
-    deleteDevice.mutate(device.id);
+    deleteDevice.mutate(device.id, {
+      onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to delete device."),
+    });
   }
 
   const columns: ColumnDef<KioskDevice>[] = [

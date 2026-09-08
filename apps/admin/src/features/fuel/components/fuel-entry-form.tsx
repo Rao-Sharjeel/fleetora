@@ -46,26 +46,30 @@ export function FuelEntryForm({ onSaved }: { onSaved?: () => void }) {
       toast.error("Please complete all required fields.");
       return;
     }
-    await createFuelEntry.mutateAsync({
-      vehicleId: vehicle.id,
-      driverId,
-      odometer: Number(odometer),
-      fuelType: vehicle.fuelType,
-      litres: Number(litres),
-      ratePerLitre: Number(rate),
-      fuelStation,
-      paymentMethod,
-      fullTank,
-    });
-    toast.success("Fuel entry recorded.");
-    setVehicle(null);
-    setDriverId("");
-    setOdometer("");
-    setLitres("");
-    setRate("");
-    setFuelStation("");
-    setPaymentMethod("");
-    onSaved?.();
+    try {
+      await createFuelEntry.mutateAsync({
+        vehicleId: vehicle.id,
+        driverId,
+        odometer: Number(odometer),
+        fuelType: vehicle.fuelType,
+        litres: Number(litres),
+        ratePerLitre: Number(rate),
+        fuelStation,
+        paymentMethod,
+        fullTank,
+      });
+      toast.success("Fuel entry recorded.");
+      setVehicle(null);
+      setDriverId("");
+      setOdometer("");
+      setLitres("");
+      setRate("");
+      setFuelStation("");
+      setPaymentMethod("");
+      onSaved?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record fuel entry.");
+    }
   }
 
   return (

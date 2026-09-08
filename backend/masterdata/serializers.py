@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from common.serializers import SafePrimaryKeyRelatedField
 from masterdata import models as m
 
 BASE_FIELDS = ["id", "code", "name", "status"]
@@ -26,10 +27,10 @@ VehicleModelSerializer = master_serializer(
     m.VehicleModelMaster,
     ["make_id", "vehicle_type_id", "year_from"],
     {
-        "make_id": serializers.PrimaryKeyRelatedField(
+        "make_id": SafePrimaryKeyRelatedField(
             source="make", queryset=m.VehicleMakeMaster.objects.all()
         ),
-        "vehicle_type_id": serializers.PrimaryKeyRelatedField(
+        "vehicle_type_id": SafePrimaryKeyRelatedField(
             source="vehicle_type", queryset=m.VehicleTypeMaster.objects.all()
         ),
     },
@@ -50,7 +51,7 @@ CostCenterSerializer = master_serializer(
     m.CostCenterMaster,
     ["department_id", "description"],
     {
-        "department_id": serializers.PrimaryKeyRelatedField(
+        "department_id": SafePrimaryKeyRelatedField(
             source="department", queryset=m.DepartmentMaster.objects.all()
         )
     },
@@ -71,7 +72,7 @@ GateSerializer = master_serializer(
     m.GateMaster,
     ["location_id", "description"],
     {
-        "location_id": serializers.PrimaryKeyRelatedField(
+        "location_id": SafePrimaryKeyRelatedField(
             source="location", queryset=m.LocationSiteMaster.objects.all()
         )
     },

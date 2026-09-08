@@ -77,21 +77,25 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
   }
 
   async function onSubmit(values: TValues) {
-    if (editingId) {
-      await updateRecord.mutateAsync({ id: editingId, patch: values as unknown as Partial<MasterDataCollections[K]> });
-      toast.success("Record updated.");
-    } else {
-      await createRecord.mutateAsync(values as unknown as Omit<MasterDataCollections[K], "id" | "status">);
-      toast.success("Record added.");
+    try {
+      if (editingId) {
+        await updateRecord.mutateAsync({ id: editingId, patch: values as unknown as Partial<MasterDataCollections[K]> });
+        toast.success("Record updated.");
+      } else {
+        await createRecord.mutateAsync(values as unknown as Omit<MasterDataCollections[K], "id" | "status">);
+        toast.success("Record added.");
+      }
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save record.");
     }
-    setOpen(false);
   }
 
   function toggleStatus(record: T, checked: boolean) {
-    updateRecord.mutate({
-      id: record.id,
-      patch: { status: checked ? "active" : "inactive" } as Partial<MasterDataCollections[K]>,
-    });
+    updateRecord.mutate(
+      { id: record.id, patch: { status: checked ? "active" : "inactive" } as Partial<MasterDataCollections[K]> },
+      { onError: (err) => toast.error(err instanceof Error ? err.message : "Failed to update status.") },
+    );
   }
 
   const fullColumns: ColumnDef<T>[] = [

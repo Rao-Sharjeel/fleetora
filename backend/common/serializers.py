@@ -2,6 +2,7 @@ import base64
 import binascii
 import uuid
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 
@@ -34,3 +35,24 @@ class Base64ImageField(serializers.ImageField):
             ext = content_type.split("/")[-1] or "jpg"
             data = ContentFile(decoded, name=f"{uuid.uuid4()}.{ext}")
         return super().to_internal_value(data)
+
+
+class SafePrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
+    """PrimaryKeyRelatedField, but safe against a UUID-pk model being handed an
+    empty string. An unselected optional <select> in the frontend submits ""
+    rather than omitting the field — Django's UUIDField.to_python() rejects
+    that with its own ValidationError, which DRF's PrimaryKeyRelatedField
+    doesn't catch (it only catches TypeError/ValueError), so it was reaching
+    the client as an unhandled 500 instead of a clean 400 or a no-op. "" is
+    now treated the same as not selecting anything: None when the field
+    allows null, otherwise a normal "this field is required" validation error."""
+
+    def to_internal_value(self, data):
+        if data == "":
+            if self.allow_null:
+                return None
+            self.fail("does_not_exist", pk_value=data)
+        try:
+            return super().to_internal_value(data)
+        except DjangoValidationError:
+            self.fail("does_not_exist", pk_value=data)

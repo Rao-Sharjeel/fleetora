@@ -4,7 +4,7 @@ import binascii
 from django.utils import timezone
 from rest_framework import serializers
 
-from common.serializers import Base64ImageField
+from common.serializers import Base64ImageField, SafePrimaryKeyRelatedField
 from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle
 from masterdata.models import GateMaster
 
@@ -13,7 +13,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     # DRF's default FK field name is `assigned_driver` (-> camelCase `assignedDriver`),
     # but the TS contract is `assignedDriverId` — same story for photo -> photoUrl below.
     # Declared explicitly everywhere a plain ModelSerializer field wouldn't match src/types/index.ts.
-    assigned_driver_id = serializers.PrimaryKeyRelatedField(
+    assigned_driver_id = SafePrimaryKeyRelatedField(
         source="assigned_driver", queryset=Driver.objects.all(), required=False, allow_null=True
     )
     photo_url = serializers.ImageField(source="photo", required=False, allow_null=True)
@@ -71,7 +71,7 @@ class VehicleSerializer(serializers.ModelSerializer):
 
 
 class DriverSerializer(serializers.ModelSerializer):
-    assigned_vehicle_id = serializers.PrimaryKeyRelatedField(
+    assigned_vehicle_id = SafePrimaryKeyRelatedField(
         source="assigned_vehicle", queryset=Vehicle.objects.all(), required=False, allow_null=True
     )
     photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
@@ -110,7 +110,7 @@ class DriverSerializer(serializers.ModelSerializer):
 
 class GuardSerializer(serializers.ModelSerializer):
     photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
-    assigned_gate_id = serializers.PrimaryKeyRelatedField(
+    assigned_gate_id = SafePrimaryKeyRelatedField(
         source="assigned_gate", queryset=GateMaster.objects.all(), required=False, allow_null=True
     )
 
@@ -136,9 +136,9 @@ class GuardSerializer(serializers.ModelSerializer):
 
 
 class TripSerializer(serializers.ModelSerializer):
-    vehicle_id = serializers.PrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
-    driver_id = serializers.PrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
-    guard_id = serializers.PrimaryKeyRelatedField(
+    vehicle_id = SafePrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
+    driver_id = SafePrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
+    guard_id = SafePrimaryKeyRelatedField(
         source="guard", queryset=Guard.objects.all(), required=False, allow_null=True
     )
     trip_duration_status = serializers.SerializerMethodField()
@@ -275,8 +275,8 @@ class GateInSerializer(serializers.Serializer):
 
 
 class FuelEntrySerializer(serializers.ModelSerializer):
-    vehicle_id = serializers.PrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
-    driver_id = serializers.PrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
+    vehicle_id = SafePrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
+    driver_id = SafePrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
 
     class Meta:
         model = FuelEntry

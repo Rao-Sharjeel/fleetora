@@ -98,8 +98,12 @@ function MaintenanceThresholdsCard() {
       toast.error("Due Soon threshold must be greater than the Urgent threshold.");
       return;
     }
-    await updateThresholds.mutateAsync({ dueSoonKm: dueSoonValue, urgentKm: urgentValue });
-    toast.success("Maintenance alert thresholds updated.");
+    try {
+      await updateThresholds.mutateAsync({ dueSoonKm: dueSoonValue, urgentKm: urgentValue });
+      toast.success("Maintenance alert thresholds updated.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update thresholds.");
+    }
   }
 
   return (

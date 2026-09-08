@@ -67,10 +67,14 @@ export function RequisitionsPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    await createRequisition.mutateAsync(values);
-    toast.success("Requisition submitted for approval.");
-    form.reset();
-    setOpen(false);
+    try {
+      await createRequisition.mutateAsync(values);
+      toast.success("Requisition submitted for approval.");
+      form.reset();
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit requisition.");
+    }
   }
 
   return (

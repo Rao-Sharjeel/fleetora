@@ -141,10 +141,14 @@ export function VehiclesListPage() {
   });
 
   async function onSubmit(values: FormValues) {
-    await createVehicle.mutateAsync(values);
-    toast.success(`${values.registrationNumber} added to the fleet.`);
-    form.reset();
-    setOpen(false);
+    try {
+      await createVehicle.mutateAsync(values);
+      toast.success(`${values.registrationNumber} added to the fleet.`);
+      form.reset();
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add vehicle.");
+    }
   }
 
   return (
