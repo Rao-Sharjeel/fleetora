@@ -6,7 +6,9 @@ import { DashboardPage } from "@/features/dashboard/pages/dashboard-page";
 import { VehiclesListPage } from "@/features/vehicles/pages/vehicles-list-page";
 import { VehicleProfilePage } from "@/features/vehicles/pages/vehicle-profile-page";
 import { DriversListPage } from "@/features/drivers/pages/drivers-list-page";
+import { DriverProfilePage } from "@/features/drivers/pages/driver-profile-page";
 import { GuardsListPage } from "@/features/guards/pages/guards-list-page";
+import { GuardProfilePage } from "@/features/guards/pages/guard-profile-page";
 import { RequisitionsPage } from "@/features/requisitions/pages/requisitions-page";
 import { VehiclesOutsidePage } from "@/features/vehicles-outside/pages/vehicles-outside-page";
 import { TripRegisterPage } from "@/features/trips/pages/trip-register-page";
@@ -79,10 +81,26 @@ export default function App() {
           }
         />
         <Route
+          path="/drivers/:driverId"
+          element={
+            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+              <DriverProfilePage />
+            </RoleGuard>
+          }
+        />
+        <Route
           path="/guards"
           element={
             <RoleGuard allow={["admin"]}>
               <GuardsListPage />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/guards/:guardId"
+          element={
+            <RoleGuard allow={["admin"]}>
+              <GuardProfilePage />
             </RoleGuard>
           }
         />

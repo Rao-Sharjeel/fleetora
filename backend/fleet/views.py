@@ -1,9 +1,10 @@
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import ProtectedError, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from accounts.permissions import allow_kiosk_or_roles, allow_roles
@@ -143,6 +144,20 @@ class DriverViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return [READ_HEAVY_OR_GATE_STAFF()]
         return [OPERATIONAL_WRITE()]
+
+    def destroy(self, request, *args, **kwargs):
+        driver = self.get_object()
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            trip_count = driver.trips.count()
+            # {"detail": ...} rather than a bare string: ValidationError("...") renders
+            # as a top-level ["..."] array, which the frontend's error-message
+            # extraction (expecting {"detail": ...} or {"field": ["..."]}) doesn't
+            # recognize, silently falling back to a generic "Request failed" message.
+            raise ValidationError(
+                {"detail": f"Cannot delete this driver — they have {trip_count} trip(s) on record."}
+            )
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
     def by_code(self, request, code=None):

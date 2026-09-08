@@ -1,5 +1,5 @@
 import type { Guard } from "@/types";
-import { ApiError, apiGet, apiList, apiPost } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet, apiList, apiPatch, apiPost } from "@/lib/api-client";
 
 export async function listGuards(): Promise<Guard[]> {
   return apiList<Guard>("/guards/");
@@ -13,6 +13,16 @@ export async function createGuard(payload: CreateGuardPayload): Promise<Guard> {
 
 export async function getGuard(id: string): Promise<Guard | undefined> {
   return apiGet<Guard>(`/guards/${id}/`);
+}
+
+export type UpdateGuardPayload = Partial<CreateGuardPayload>;
+
+export async function updateGuard(id: string, patch: UpdateGuardPayload): Promise<Guard> {
+  return apiPatch<Guard>(`/guards/${id}/`, patch);
+}
+
+export async function deleteGuard(id: string): Promise<void> {
+  return apiDelete(`/guards/${id}/`);
 }
 
 export async function getGuardByCode(code: string): Promise<Guard | undefined> {

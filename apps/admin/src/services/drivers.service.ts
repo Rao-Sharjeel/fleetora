@@ -1,5 +1,5 @@
 import type { Driver } from "@/types";
-import { ApiError, apiGet, apiList, apiPost } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet, apiList, apiPatch, apiPost } from "@/lib/api-client";
 
 export async function listDrivers(): Promise<Driver[]> {
   const drivers = await apiList<WireDriver>("/drivers/");
@@ -16,6 +16,17 @@ export async function createDriver(payload: CreateDriverPayload): Promise<Driver
 export async function getDriver(id: string): Promise<Driver | undefined> {
   const driver = await apiGet<WireDriver>(`/drivers/${id}/`);
   return fromWireDriver(driver);
+}
+
+export type UpdateDriverPayload = Partial<CreateDriverPayload>;
+
+export async function updateDriver(id: string, patch: UpdateDriverPayload): Promise<Driver> {
+  const driver = await apiPatch<WireDriver>(`/drivers/${id}/`, toWireDriver(patch));
+  return fromWireDriver(driver);
+}
+
+export async function deleteDriver(id: string): Promise<void> {
+  return apiDelete(`/drivers/${id}/`);
 }
 
 export async function getDriverByCode(code: string): Promise<Driver | undefined> {

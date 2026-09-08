@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { QrCode, ShieldCheck, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { EmptyState } from "@/components/shared/empty-state";
+import { InfoCard, ListCard } from "@/components/shared/profile-cards";
 import { PhotoCapture } from "@/components/shared/photo-capture";
 import { FormField } from "@/components/shared/form-field";
 import { printVehicleQrLabel } from "@/lib/qr-print";
@@ -62,13 +61,17 @@ export function VehicleProfilePage() {
       toast.error("A reason is required when marking a vehicle not allowed to exit.");
       return;
     }
-    await setAllowedToExit.mutateAsync({
-      vehicleId: vehicle.id,
-      allowed: allowedDraft,
-      reason: allowedDraft ? undefined : reasonDraft.trim(),
-    });
-    toast.success(allowedDraft ? "Vehicle is now allowed to exit." : "Vehicle exit has been blocked.");
-    setExitDialogOpen(false);
+    try {
+      await setAllowedToExit.mutateAsync({
+        vehicleId: vehicle.id,
+        allowed: allowedDraft,
+        reason: allowedDraft ? undefined : reasonDraft.trim(),
+      });
+      toast.success(allowedDraft ? "Vehicle is now allowed to exit." : "Vehicle exit has been blocked.");
+      setExitDialogOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update exit access.");
+    }
   }
 
   const vehicleTrips = trips.filter((t) => t.vehicleId === vehicle.id);
@@ -309,44 +312,5 @@ export function VehicleProfilePage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function InfoCard({ title, value }: { title: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 text-lg font-semibold capitalize">{value}</CardContent>
-    </Card>
-  );
-}
-
-function ListCard<T>({
-  title,
-  items,
-  empty,
-  render,
-}: {
-  title: string;
-  items: T[];
-  empty: string;
-  render: (item: T) => React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {items.length === 0 && <EmptyState title={empty} />}
-        {items.map((item, i) => (
-          <div key={i} className="rounded-md border border-border p-3 text-sm">
-            {render(item)}
-          </div>
-        ))}
-      </CardContent>
-    </Card>
   );
 }

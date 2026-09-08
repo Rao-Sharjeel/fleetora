@@ -8,6 +8,9 @@ interface PhotoCaptureProps {
   required?: boolean;
   onCapture?: (file: File) => void;
   className?: string;
+  /** Shows an existing photo (e.g. a record's current photoUrl) before anything
+   * new is captured — used when editing a record that already has a photo. */
+  initialPreviewUrl?: string;
 }
 
 /**
@@ -15,9 +18,9 @@ interface PhotoCaptureProps {
  * `capture="environment"` opens the device camera directly on mobile instead of
  * the photo gallery, matching the spec's "prefer direct camera capture" rule.
  */
-export function PhotoCapture({ label, required, onCapture, className }: PhotoCaptureProps) {
+export function PhotoCapture({ label, required, onCapture, className, initialPreviewUrl }: PhotoCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(initialPreviewUrl ?? null);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
