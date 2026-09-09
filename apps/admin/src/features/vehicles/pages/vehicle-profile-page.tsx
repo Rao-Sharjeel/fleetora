@@ -30,12 +30,13 @@ import { useAuditLog } from "@/features/audit/hooks";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
 import { useMasterCollection } from "@/features/master-data/hooks";
 import { useSession } from "@/hooks/use-session";
+import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 
 export function VehicleProfilePage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
   const role = useSession((s) => s.role);
-  const { data: vehicle } = useVehicle(vehicleId);
+  const { data: vehicle, isLoading } = useVehicle(vehicleId);
   const { data: driver } = useDriver(vehicle?.assignedDriverId);
   const { data: trips = [] } = useTrips();
   const { data: fuelEntries = [] } = useFuelEntries();
@@ -51,7 +52,8 @@ export function VehicleProfilePage() {
   const [allowedDraft, setAllowedDraft] = useState(true);
   const [reasonDraft, setReasonDraft] = useState("");
 
-  if (!vehicle) return <p className="text-sm text-muted-foreground">Loading vehicle…</p>;
+  if (isLoading) return <ProfileSkeleton tabs={8} avatar={false} />;
+  if (!vehicle) return <p className="text-sm text-muted-foreground">Vehicle not found.</p>;
 
   const canWrite = role === "admin" || role === "fleet_manager";
 

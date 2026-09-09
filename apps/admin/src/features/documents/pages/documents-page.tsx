@@ -49,11 +49,7 @@ export function DocumentsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Vehicle & Driver Documents" description="Registration, insurance, permits and licence expiry tracking." />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading documents…</p>
-      ) : (
-        <DataTable columns={columns} data={documents} searchPlaceholder="Search documents…" />
-      )}
+      <DataTable columns={columns} data={documents} searchPlaceholder="Search documents…" isLoading={isLoading} />
     </div>
   );
 }

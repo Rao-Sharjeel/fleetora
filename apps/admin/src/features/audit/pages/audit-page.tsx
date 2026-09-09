@@ -20,11 +20,7 @@ export function AuditPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Audit Trail" description="Every administrative override and correction, with reason." />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading audit log…</p>
-      ) : (
-        <DataTable columns={columns} data={entries} searchPlaceholder="Search audit trail…" />
-      )}
+      <DataTable columns={columns} data={entries} searchPlaceholder="Search audit trail…" isLoading={isLoading} />
     </div>
   );
 }

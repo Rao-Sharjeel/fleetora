@@ -12,17 +12,19 @@ import { useTrips } from "@/features/trips/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
 import { useSession } from "@/hooks/use-session";
 import { formatDateTime, formatKm } from "@/lib/formatters";
+import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 
 export function GuardProfilePage() {
   const { guardId } = useParams<{ guardId: string }>();
   const navigate = useNavigate();
   const role = useSession((s) => s.role);
-  const { data: guard } = useGuard(guardId);
+  const { data: guard, isLoading } = useGuard(guardId);
   const { data: trips = [] } = useTrips();
   const { data: gates = [] } = useMasterCollection("gates");
   const deleteGuard = useDeleteGuard();
 
-  if (!guard) return <p className="text-sm text-muted-foreground">Loading guard…</p>;
+  if (isLoading) return <ProfileSkeleton tabs={3} />;
+  if (!guard) return <p className="text-sm text-muted-foreground">Guard not found.</p>;
 
   const canWrite = role === "admin";
   const guardTrips = trips.filter((t) => t.guardId === guard.id);

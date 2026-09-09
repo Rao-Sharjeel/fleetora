@@ -135,11 +135,7 @@ export function KioskDevicesPage() {
         }
       />
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading devices…</p>
-      ) : (
-        <DataTable columns={columns} data={devices} searchPlaceholder="Search devices…" />
-      )}
+      <DataTable columns={columns} data={devices} searchPlaceholder="Search devices…" isLoading={isLoading} />
 
       <IssuedKeyDialog issued={issuedKey} onClose={() => setIssuedKey(null)} />
     </div>

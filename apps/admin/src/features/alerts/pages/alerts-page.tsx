@@ -1,6 +1,7 @@
 import { Bell } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CardGridSkeleton } from "@/components/shared/card-grid-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAlerts } from "@/features/alerts/hooks";
@@ -21,7 +22,7 @@ export function AlertsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader title="Alerts & Notifications" description="Maintenance, tyre, document and fuel-exception alerts." />
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading alerts…</p>
+        <CardGridSkeleton layout="stack" count={5} lines={2} />
       ) : alerts.length === 0 ? (
         <EmptyState icon={Bell} title="No active alerts." />
       ) : (

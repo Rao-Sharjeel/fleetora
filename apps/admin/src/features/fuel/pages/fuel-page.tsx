@@ -63,11 +63,7 @@ export function FuelPage() {
         <KpiCard label="Total Fuel Cost" value={formatCurrency(totalCost)} />
       </div>
 
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading fuel entries…</p>
-      ) : (
-        <DataTable columns={columns} data={entries} searchPlaceholder="Search by station or payment method…" />
-      )}
+      <DataTable columns={columns} data={entries} searchPlaceholder="Search by station or payment method…" isLoading={isLoading} />
     </div>
   );
 }

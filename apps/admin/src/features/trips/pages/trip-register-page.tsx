@@ -40,6 +40,7 @@ export function TripRegisterPage() {
     {
       accessorKey: "status",
       header: "Status",
+      meta: { skeleton: "badge" },
       cell: ({ getValue }) => <StatusBadge status={getValue<Trip["status"]>()} />,
     },
   ];
@@ -47,11 +48,7 @@ export function TripRegisterPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Trip Register" description="Complete history of Gate-Out / Gate-In movements." />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading trips…</p>
-      ) : (
-        <DataTable columns={columns} data={trips} searchPlaceholder="Search by trip, purpose or destination…" />
-      )}
+      <DataTable columns={columns} data={trips} searchPlaceholder="Search by trip, purpose or destination…" isLoading={isLoading} />
     </div>
   );
 }

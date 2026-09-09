@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CardGridSkeleton } from "@/components/shared/card-grid-skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -154,7 +155,7 @@ export function MaintenancePage() {
       />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading maintenance records…</p>
+        <CardGridSkeleton count={6} lines={3} />
       ) : records.length === 0 ? (
         <EmptyState title="No maintenance records yet." />
       ) : (

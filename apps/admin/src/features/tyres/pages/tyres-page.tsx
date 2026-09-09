@@ -54,11 +54,7 @@ export function TyresPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Tyre Management" description="Tyre inventory, position tracking and mileage life." />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading tyres…</p>
-      ) : (
-        <DataTable columns={columns} data={tyres} searchPlaceholder="Search by tyre ID or brand…" />
-      )}
+      <DataTable columns={columns} data={tyres} searchPlaceholder="Search by tyre ID or brand…" isLoading={isLoading} />
     </div>
   );
 }

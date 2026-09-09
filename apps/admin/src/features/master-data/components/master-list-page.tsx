@@ -158,11 +158,7 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
           </Dialog>
         }
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <DataTable columns={fullColumns} data={records as unknown as T[]} searchPlaceholder="Search…" />
-      )}
+      <DataTable columns={fullColumns} data={records as unknown as T[]} searchPlaceholder="Search…" isLoading={isLoading} />
     </div>
   );
 }

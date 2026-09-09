@@ -16,6 +16,7 @@ import { formatDate } from "@/lib/formatters";
 const columns: ColumnDef<Driver>[] = [
   {
     id: "photo",
+    meta: { skeleton: "circle" },
     header: "",
     cell: ({ row }) => (
       <Avatar>
@@ -36,11 +37,13 @@ const columns: ColumnDef<Driver>[] = [
   },
   {
     id: "licenceStatus",
+    meta: { skeleton: "badge" },
     header: "Licence Status",
     cell: ({ row }) => <StatusBadge status={licenceStatus(row.original.licenceExpiry)} />,
   },
   {
     id: "idCard",
+    meta: { skeleton: "action" },
     header: "",
     cell: ({ row }) => (
       <Button
@@ -74,16 +77,13 @@ export function DriversListPage() {
         description="Registered drivers, licence status and department assignment."
         actions={<DriverFormDialog mode="add" />}
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading drivers…</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={drivers}
-          searchPlaceholder="Search by name or employee ID…"
-          onRowClick={(driver) => navigate(`/drivers/${driver.id}`)}
-        />
-      )}
+      <DataTable
+        columns={columns}
+        data={drivers}
+        searchPlaceholder="Search by name or employee ID…"
+        onRowClick={(driver) => navigate(`/drivers/${driver.id}`)}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

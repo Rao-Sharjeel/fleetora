@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CardGridSkeleton } from "@/components/shared/card-grid-skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useOpenTrips } from "@/features/trips/hooks";
@@ -25,7 +26,7 @@ export function VehiclesOutsidePage() {
     <div className="flex flex-col gap-6">
       <PageHeader title="Vehicles Currently Outside" description="Live list of all open trips." />
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <CardGridSkeleton count={6} lines={3} />
       ) : trips.length === 0 ? (
         <EmptyState title="No vehicles are outside right now." />
       ) : (

@@ -14,6 +14,7 @@ import type { Guard } from "@/types";
 const columns: ColumnDef<Guard>[] = [
   {
     id: "photo",
+    meta: { skeleton: "circle" },
     header: "",
     cell: ({ row }) => (
       <Avatar>
@@ -30,6 +31,7 @@ const columns: ColumnDef<Guard>[] = [
   {
     accessorKey: "status",
     header: "Status",
+    meta: { skeleton: "badge" },
     cell: ({ getValue }) => {
       const status = getValue<Guard["status"]>();
       return (
@@ -41,6 +43,7 @@ const columns: ColumnDef<Guard>[] = [
   },
   {
     id: "idCard",
+    meta: { skeleton: "action" },
     header: "",
     cell: ({ row }) => (
       <Button
@@ -74,16 +77,13 @@ export function GuardsListPage() {
         description="Guards authorized to operate Gate-Out / Gate-In on the mobile app."
         actions={<GuardFormDialog mode="add" />}
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading guards…</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={guards}
-          searchPlaceholder="Search by name or guard ID…"
-          onRowClick={(guard) => navigate(`/guards/${guard.id}`)}
-        />
-      )}
+      <DataTable
+        columns={columns}
+        data={guards}
+        searchPlaceholder="Search by name or guard ID…"
+        onRowClick={(guard) => navigate(`/guards/${guard.id}`)}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

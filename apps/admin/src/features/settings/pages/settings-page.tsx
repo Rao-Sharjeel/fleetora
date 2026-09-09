@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/shared/form-field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings, useUpdateMaintenanceThresholds } from "@/features/settings/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
 
@@ -17,9 +18,23 @@ const THEME_SWATCHES = [
   { label: "Foreground", var: "--foreground" },
 ];
 
+/** Stand-in for a wrapped row of badge chips, at assorted chip widths. */
+function BadgeRowSkeleton() {
+  return (
+    <>
+      <span className="sr-only" role="status">
+        Loading…
+      </span>
+      {["w-20", "w-28", "w-16", "w-24", "w-32", "w-20"].map((w, i) => (
+        <Skeleton key={i} className={`h-6 ${w} rounded-full`} />
+      ))}
+    </>
+  );
+}
+
 export function SettingsPage() {
-  const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
-  const { data: departments = [] } = useMasterCollection("departmentMasters");
+  const { data: purposes = [], isLoading: purposesLoading } = useMasterCollection("vehiclePurposes");
+  const { data: departments = [], isLoading: departmentsLoading } = useMasterCollection("departmentMasters");
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,11 +66,15 @@ export function SettingsPage() {
           <CardTitle>Configurable Trip Purposes</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {purposes.map((p) => (
-            <Badge key={p.id} variant="outline" dot={false}>
-              {p.name}
-            </Badge>
-          ))}
+          {purposesLoading ? (
+            <BadgeRowSkeleton />
+          ) : (
+            purposes.map((p) => (
+              <Badge key={p.id} variant="outline" dot={false}>
+                {p.name}
+              </Badge>
+            ))
+          )}
         </CardContent>
       </Card>
 
@@ -64,11 +83,15 @@ export function SettingsPage() {
           <CardTitle>Departments</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {departments.map((d) => (
-            <Badge key={d.id} variant="outline" dot={false}>
-              {d.name}
-            </Badge>
-          ))}
+          {departmentsLoading ? (
+            <BadgeRowSkeleton />
+          ) : (
+            departments.map((d) => (
+              <Badge key={d.id} variant="outline" dot={false}>
+                {d.name}
+              </Badge>
+            ))
+          )}
         </CardContent>
       </Card>
 
@@ -114,7 +137,28 @@ function MaintenanceThresholdsCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div aria-busy className="flex flex-col gap-4">
+            <span className="sr-only" role="status">
+              Loading settings…
+            </span>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-4 sm:max-w-md sm:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-9 w-36" />
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

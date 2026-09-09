@@ -182,11 +182,7 @@ export function UsersPage() {
           </Dialog>
         }
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading users…</p>
-      ) : (
-        <DataTable columns={columns} data={users} searchPlaceholder="Search users…" />
-      )}
+      <DataTable columns={columns} data={users} searchPlaceholder="Search users…" isLoading={isLoading} />
     </div>
   );
 }

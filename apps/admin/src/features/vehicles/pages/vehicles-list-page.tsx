@@ -29,10 +29,12 @@ const columns: ColumnDef<Vehicle>[] = [
   {
     accessorKey: "status",
     header: "Status",
+    meta: { skeleton: "badge" },
     cell: ({ getValue }) => <StatusBadge status={getValue<Vehicle["status"]>()} />,
   },
   {
     id: "qr",
+    meta: { skeleton: "action" },
     header: "",
     cell: ({ row }) => (
       <Button
@@ -61,16 +63,13 @@ export function VehiclesListPage() {
         description="All registered vehicles and their live status. Click a row to open its profile."
         actions={<VehicleFormDialog mode="add" />}
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading vehicles…</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={vehicles}
-          searchPlaceholder="Search by registration, make or department…"
-          onRowClick={(vehicle) => navigate(`/vehicles/${vehicle.id}`)}
-        />
-      )}
+      <DataTable
+        columns={columns}
+        data={vehicles}
+        searchPlaceholder="Search by registration, make or department…"
+        onRowClick={(vehicle) => navigate(`/vehicles/${vehicle.id}`)}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

@@ -17,12 +17,13 @@ import { useMasterCollection } from "@/features/master-data/hooks";
 import { useSession } from "@/hooks/use-session";
 import { licenceStatus } from "@/services/drivers.service";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
+import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 
 export function DriverProfilePage() {
   const { driverId } = useParams<{ driverId: string }>();
   const navigate = useNavigate();
   const role = useSession((s) => s.role);
-  const { data: driver } = useDriver(driverId);
+  const { data: driver, isLoading } = useDriver(driverId);
   const { data: assignedVehicle } = useVehicle(driver?.assignedVehicleId);
   const { data: trips = [] } = useTrips();
   const { data: fuelEntries = [] } = useFuelEntries();
@@ -30,7 +31,8 @@ export function DriverProfilePage() {
   const { data: documentTypes = [] } = useMasterCollection("documentTypes");
   const deleteDriver = useDeleteDriver();
 
-  if (!driver) return <p className="text-sm text-muted-foreground">Loading driver…</p>;
+  if (isLoading) return <ProfileSkeleton tabs={4} />;
+  if (!driver) return <p className="text-sm text-muted-foreground">Driver not found.</p>;
 
   const canWrite = role === "admin" || role === "fleet_manager";
 

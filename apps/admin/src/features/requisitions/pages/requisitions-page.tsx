@@ -147,11 +147,7 @@ export function RequisitionsPage() {
           </Dialog>
         }
       />
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading requisitions…</p>
-      ) : (
-        <DataTable columns={columns} data={requisitions} searchPlaceholder="Search requisitions…" />
-      )}
+      <DataTable columns={columns} data={requisitions} searchPlaceholder="Search requisitions…" isLoading={isLoading} />
     </div>
   );
 }
