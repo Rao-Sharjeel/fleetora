@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.db import connection, models
+from django.dispatch import receiver
 from django.utils import timezone
 
 from common.models import Sequence
@@ -15,6 +16,10 @@ def driver_photo_path(instance, filename):
 
 def guard_photo_path(instance, filename):
     return f"guards/{connection.schema_name}/{instance.id}/{filename}"
+
+
+def vehicle_photo_path(instance, filename):
+    return f"vehicles/{connection.schema_name}/{instance.vehicle_id}/{filename}"
 
 
 class Driver(models.Model):
@@ -125,7 +130,6 @@ class Vehicle(models.Model):
     expected_fuel_average_kmpl = models.FloatField()
     current_odometer = models.PositiveIntegerField()
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.AVAILABLE)
-    photo = models.ImageField(upload_to="vehicles/", null=True, blank=True)
     qr_code = models.CharField(max_length=30, unique=True, editable=False)
     seating_capacity = models.PositiveSmallIntegerField(null=True, blank=True)
     transmission = models.CharField(max_length=10, choices=Transmission.choices, blank=True, default="")
@@ -155,6 +159,40 @@ class Vehicle(models.Model):
 
     def __str__(self) -> str:
         return f"{self.registration_number} ({self.internal_id})"
+
+
+class VehiclePhoto(models.Model):
+    """One of up to MAX_PER_VEHICLE photos of a vehicle.
+
+    Unlike driver/guard headshots these are not cropped to a square — a vehicle
+    is photographed from whatever angle and aspect ratio the camera gives.
+    """
+
+    MAX_PER_VEHICLE = 5
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=vehicle_photo_path)
+    # Display order in the gallery; the first photo doubles as the vehicle's
+    # thumbnail wherever a single image is needed.
+    position = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["position", "created_at"]
+
+    def __str__(self) -> str:
+        return f"Photo {self.position} of {self.vehicle_id}"
+
+
+@receiver(models.signals.post_delete, sender=VehiclePhoto)
+def delete_vehicle_photo_file(sender, instance, **kwargs):
+    """Swapping a vehicle's photos is routine, so the replaced files would pile
+    up in the bucket forever if the row's deletion didn't take the file with it.
+    `save=False` because the row is already gone.
+    """
+    if instance.image:
+        instance.image.delete(save=False)
 
 
 class Trip(models.Model):

@@ -19,6 +19,7 @@ from fleet.serializers import (
     ReadOdometerSerializer,
     SetAllowedToExitSerializer,
     TripSerializer,
+    VehicleListSerializer,
     VehicleSerializer,
 )
 from fleet.services import OdometerImageTooLarge, extract_odometer_reading
@@ -37,9 +38,17 @@ READ_HEAVY_OR_GATE_STAFF = allow_roles("admin", "fleet_manager", "management", "
 
 
 class VehicleViewSet(viewsets.ModelViewSet):
-    queryset = Vehicle.objects.all().order_by("registration_number")
+    queryset = Vehicle.objects.prefetch_related("photos").order_by("registration_number")
     serializer_class = VehicleSerializer
     filterset_fields = ["status", "allowed_to_exit"]
+
+    def get_serializer_class(self):
+        # The list screen shows no vehicle imagery, and every photo costs a
+        # presigned-URL signing round on the way out. Only the detail response,
+        # which actually renders the gallery, pays for it.
+        if self.action == "list":
+            return VehicleListSerializer
+        return VehicleSerializer
 
     def get_permissions(self):
         if self.action in ("by_code", "gate_in", "read_odometer"):
@@ -77,7 +86,9 @@ class VehicleViewSet(viewsets.ModelViewSet):
         ).first()
         if not vehicle:
             return Response(status=404)
-        return Response(VehicleSerializer(vehicle).data)
+        # Kiosk gate path — identifies the vehicle, never shows its photos, so
+        # it skips the gallery's presigned-URL signing like the list does.
+        return Response(VehicleListSerializer(vehicle).data)
 
     @action(detail=False, methods=["post"], url_path="read-odometer")
     def read_odometer(self, request):

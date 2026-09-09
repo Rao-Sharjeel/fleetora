@@ -1,12 +1,65 @@
 import base64
 import binascii
+import uuid
 
 from django.utils import timezone
 from rest_framework import serializers
 
 from common.serializers import Base64ImageField, SafePrimaryKeyRelatedField
-from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle
+from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle, VehiclePhoto
 from masterdata.models import GateMaster
+
+
+class VehiclePhotoListField(serializers.ListField):
+    """The vehicle gallery, in one field.
+
+    Reads as a list of `{"id", "url"}`. Writes as the full desired list, where
+    each entry is either an existing photo's id (keep it, at that position) or
+    a base64 data URL (a newly captured image). Anything not named is deleted,
+    so one PATCH covers add, remove and reorder.
+    """
+
+    child = serializers.CharField()
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", VehiclePhoto.MAX_PER_VEHICLE)
+        kwargs.setdefault(
+            "error_messages",
+            {"max_length": f"A vehicle can have at most {VehiclePhoto.MAX_PER_VEHICLE} photos."},
+        )
+        super().__init__(**kwargs)
+
+    def get_attribute(self, instance):
+        return instance
+
+    def to_representation(self, vehicle):
+        request = self.context.get("request")
+        photos = []
+        for photo in vehicle.photos.all():
+            url = photo.image.url
+            photos.append({"id": str(photo.id), "url": request.build_absolute_uri(url) if request else url})
+        return photos
+
+    def to_internal_value(self, data):
+        entries = super().to_internal_value(data)
+        decoder = Base64ImageField()
+        resolved = []
+        for entry in entries:
+            # An existing photo is referenced by its id; anything else has to be
+            # a fresh capture, which Base64ImageField turns into a file.
+            if _looks_like_uuid(entry):
+                resolved.append(("keep", entry))
+            else:
+                resolved.append(("new", decoder.to_internal_value(entry)))
+        return resolved
+
+
+def _looks_like_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return True
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -16,7 +69,8 @@ class VehicleSerializer(serializers.ModelSerializer):
     assigned_driver_id = SafePrimaryKeyRelatedField(
         source="assigned_driver", queryset=Driver.objects.all(), required=False, allow_null=True
     )
-    photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
+    photos = VehiclePhotoListField(required=False)
+    photo_url = serializers.SerializerMethodField()
     allowed_to_exit_updated_by = serializers.SerializerMethodField()
 
     class Meta:
@@ -39,6 +93,7 @@ class VehicleSerializer(serializers.ModelSerializer):
             "expected_fuel_average_kmpl",
             "current_odometer",
             "status",
+            "photos",
             "photo_url",
             "qr_code",
             "seating_capacity",
@@ -68,6 +123,46 @@ class VehicleSerializer(serializers.ModelSerializer):
 
     def get_allowed_to_exit_updated_by(self, obj: Vehicle) -> str | None:
         return obj.allowed_to_exit_updated_by.name if obj.allowed_to_exit_updated_by else None
+
+    def get_photo_url(self, obj: Vehicle) -> str | None:
+        """The first gallery photo, kept so anything wanting a single
+        thumbnail for a vehicle doesn't have to reach into the list."""
+        photo = obj.photos.first()
+        if not photo:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(photo.image.url) if request else photo.image.url
+
+    def create(self, validated_data):
+        photos = validated_data.pop("photos", None)
+        vehicle = super().create(validated_data)
+        if photos:
+            self._sync_photos(vehicle, photos)
+        return vehicle
+
+    def update(self, instance, validated_data):
+        # A missing key means "leave the gallery alone"; an empty list means
+        # "remove every photo", so the two can't be collapsed.
+        photos = validated_data.pop("photos", None)
+        vehicle = super().update(instance, validated_data)
+        if photos is not None:
+            self._sync_photos(vehicle, photos)
+        return vehicle
+
+    @staticmethod
+    def _sync_photos(vehicle: Vehicle, entries: list[tuple[str, object]]) -> None:
+        kept_ids = [value for kind, value in entries if kind == "keep"]
+        vehicle.photos.exclude(id__in=kept_ids).delete()
+
+        existing = {str(photo.id): photo for photo in vehicle.photos.all()}
+        for position, (kind, value) in enumerate(entries):
+            if kind == "keep":
+                photo = existing.get(value)
+                if photo and photo.position != position:
+                    photo.position = position
+                    photo.save(update_fields=["position"])
+            else:
+                VehiclePhoto.objects.create(vehicle=vehicle, image=value, position=position)
 
 
 class DriverSerializer(serializers.ModelSerializer):
@@ -133,6 +228,14 @@ class GuardSerializer(serializers.ModelSerializer):
             "photo_url",
         ]
         read_only_fields = ["id"]
+
+
+class VehicleListSerializer(VehicleSerializer):
+    """Vehicle without its gallery, for the list endpoint — see
+    `VehicleViewSet.get_serializer_class` for why."""
+
+    class Meta(VehicleSerializer.Meta):
+        fields = [f for f in VehicleSerializer.Meta.fields if f not in ("photos", "photo_url")]
 
 
 class TripSerializer(serializers.ModelSerializer):

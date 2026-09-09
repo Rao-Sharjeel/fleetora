@@ -13,6 +13,14 @@ export interface RoleDefinition {
 
 export type VehicleStatus = "available" | "outside" | "workshop" | "inactive";
 
+/** Mirrors fleet.models.VehiclePhoto.MAX_PER_VEHICLE — the backend rejects more. */
+export const MAX_VEHICLE_PHOTOS = 5;
+
+export interface VehiclePhoto {
+  id: string;
+  url: string;
+}
+
 export interface Vehicle {
   id: string;
   internalId: string;
@@ -31,6 +39,11 @@ export interface Vehicle {
   expectedFuelAverageKmpl: number;
   currentOdometer: number;
   status: VehicleStatus;
+  /** Up to MAX_VEHICLE_PHOTOS images, any aspect ratio, in display order.
+   * Absent on the list endpoint, which omits the gallery — see
+   * fleet.views.VehicleViewSet.get_serializer_class. */
+  photos?: VehiclePhoto[];
+  /** The first gallery photo. Detail responses only, same as `photos`. */
   photoUrl?: string;
   qrCode: string;
   seatingCapacity?: number;

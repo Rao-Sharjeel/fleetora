@@ -5,9 +5,16 @@ export async function listVehicles(): Promise<Vehicle[]> {
   return apiList<Vehicle>("/vehicles/");
 }
 
-export type CreateVehiclePayload = Omit<Vehicle, "id" | "internalId" | "qrCode" | "status" | "allowedToExit"> & {
+export type CreateVehiclePayload = Omit<
+  Vehicle,
+  "id" | "internalId" | "qrCode" | "status" | "allowedToExit" | "photos" | "photoUrl"
+> & {
   status?: Vehicle["status"];
   allowedToExit?: boolean;
+  /** The gallery reads back as objects but is written as a flat list: an
+   * existing photo's id to keep it, or a base64 data URL for a new one, in
+   * display order. Omit to leave the gallery untouched; `[]` clears it. */
+  photos?: string[];
 };
 
 export async function createVehicle(payload: CreateVehiclePayload): Promise<Vehicle> {

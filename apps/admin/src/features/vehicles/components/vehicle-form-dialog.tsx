@@ -5,7 +5,12 @@ import { z } from "zod";
 import { Pencil, Plus, Car, Settings2, Building2, Gauge, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
-import { PhotoCapture } from "@/components/shared/photo-capture";
+import {
+  PhotoGalleryCapture,
+  galleryToPayload,
+  photosToGallery,
+  type GalleryEntry,
+} from "@/components/shared/photo-gallery-capture";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogTrigger, FullScreenDialogContent } from "@/components/ui/dialog";
@@ -20,8 +25,8 @@ import {
 } from "@/components/shared/form-modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateVehicle, useUpdateVehicle } from "@/features/vehicles/hooks";
-import type { Vehicle } from "@/types";
-import { emptyToUndefined, fileToDataUrl } from "@/lib/utils";
+import { MAX_VEHICLE_PHOTOS, type Vehicle } from "@/types";
+import { emptyToUndefined } from "@/lib/utils";
 
 const FUEL_TYPES: Vehicle["fuelType"][] = ["petrol", "diesel", "other"];
 const TRANSMISSIONS: NonNullable<Vehicle["transmission"]>[] = ["manual", "automatic"];
@@ -40,7 +45,6 @@ const schema = z.object({
   make: z.string().min(1, "Required"),
   model: z.string().min(1, "Required"),
   variant: z.string().optional(),
-  photoUrl: z.string().optional(),
   year: z.number().int("Whole number").min(1980, "Too old").max(new Date().getFullYear() + 1, "Not yet"),
   colour: z.string().min(1, "Required"),
   fuelType: z.enum(["petrol", "diesel", "other"]),
@@ -67,7 +71,6 @@ const emptyDefaults: FormValues = {
   make: "",
   model: "",
   variant: "",
-  photoUrl: undefined,
   year: new Date().getFullYear(),
   colour: "",
   fuelType: "petrol",
@@ -87,9 +90,6 @@ const emptyDefaults: FormValues = {
   timingBeltChangeKm: undefined,
 };
 
-// photoUrl stays undefined here for the same reason as DriverFormDialog: it
-// only ever accepts a fresh base64 capture, never the record's existing
-// https:// photo URL. PhotoCapture shows that via `initialPreviewUrl` instead.
 function vehicleToFormValues(vehicle: Vehicle): FormValues {
   return {
     registrationNumber: vehicle.registrationNumber,
@@ -97,7 +97,6 @@ function vehicleToFormValues(vehicle: Vehicle): FormValues {
     make: vehicle.make,
     model: vehicle.model,
     variant: vehicle.variant ?? "",
-    photoUrl: undefined,
     year: vehicle.year,
     colour: vehicle.colour,
     fuelType: vehicle.fuelType,
@@ -139,6 +138,10 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
   const createVehicle = useCreateVehicle();
   const updateVehicle = useUpdateVehicle();
   const [open, setOpen] = useState(false);
+  // The gallery lives outside the zod schema: it's a list of objects, nothing
+  // about it is validated, and routing it through react-hook-form would buy
+  // nothing over plain state.
+  const [gallery, setGallery] = useState<GalleryEntry[]>(photosToGallery(vehicle?.photos));
   const { containerRef, activeId } = useFormModalScrollSpy(VEHICLE_SECTIONS);
 
   const form = useForm<FormValues>({
@@ -154,17 +157,19 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
     if (!next && isPending) return;
     if (next) {
       form.reset(mode === "edit" && vehicle ? vehicleToFormValues(vehicle) : emptyDefaults);
+      setGallery(photosToGallery(mode === "edit" ? vehicle?.photos : undefined));
     }
     setOpen(next);
   }
 
   async function onSubmit(values: FormValues) {
+    const payload = { ...values, photos: galleryToPayload(gallery) };
     try {
       if (mode === "edit" && vehicle) {
-        await updateVehicle.mutateAsync({ id: vehicle.id, patch: values });
+        await updateVehicle.mutateAsync({ id: vehicle.id, patch: payload });
         toast.success(`${values.registrationNumber} updated.`);
       } else {
-        await createVehicle.mutateAsync(values);
+        await createVehicle.mutateAsync(payload);
         toast.success(`${values.registrationNumber} added to the fleet.`);
       }
       setOpen(false);
@@ -209,10 +214,11 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
                 title="Identity & Registration"
                 description="Core identity fields used across the fleet."
               >
-                <PhotoCapture
-                  label="Vehicle Photo"
-                  initialPreviewUrl={vehicle?.photoUrl}
-                  onCapture={async (file) => form.setValue("photoUrl", await fileToDataUrl(file))}
+                <PhotoGalleryCapture
+                  label="Vehicle Photos"
+                  value={gallery}
+                  onChange={setGallery}
+                  max={MAX_VEHICLE_PHOTOS}
                 />
                 <FormField label="Registration Number" error={form.formState.errors.registrationNumber?.message}>
                   <Input {...form.register("registrationNumber")} placeholder="e.g. LEA-1234" />

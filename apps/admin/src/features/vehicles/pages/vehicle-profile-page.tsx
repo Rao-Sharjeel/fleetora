@@ -20,6 +20,7 @@ import { FormField } from "@/components/shared/form-field";
 import { printVehicleQrLabel } from "@/lib/qr-print";
 import { useVehicle, useSetAllowedToExit, useDeleteVehicle } from "@/features/vehicles/hooks";
 import { VehicleFormDialog } from "@/features/vehicles/components/vehicle-form-dialog";
+import { VehiclePhotoGallery } from "@/features/vehicles/components/vehicle-photo-gallery";
 import { useDriver } from "@/features/drivers/hooks";
 import { useTrips } from "@/features/trips/hooks";
 import { useFuelEntries } from "@/features/fuel/hooks";
@@ -203,15 +204,7 @@ export function VehicleProfilePage() {
 
         <TabsContent value="overview">
           <div className="flex flex-col gap-4 lg:flex-row">
-            <div className="h-48 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
-              {vehicle.photoUrl ? (
-                <img src={vehicle.photoUrl} alt={vehicle.registrationNumber} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-muted-foreground">
-                  {vehicle.registrationNumber.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
+            <VehiclePhotoGallery photos={vehicle.photos ?? []} alt={vehicle.registrationNumber} />
             <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <InfoCard title="Make / Model" value={`${vehicle.make} ${vehicle.model} ${vehicle.variant ?? ""}`} />
               <InfoCard title="Year / Colour" value={`${vehicle.year} · ${vehicle.colour}`} />
