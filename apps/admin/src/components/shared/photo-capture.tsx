@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Camera, Loader2, RefreshCcw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { resizeImageFile } from "@/lib/crop-image";
+import { ACCEPTED_IMAGE_TYPES, partitionAcceptedImages, resizeImageFile } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
 
 interface PhotoCaptureProps {
@@ -25,10 +26,16 @@ export function PhotoCapture({ label, required, onCapture, className, initialPre
   const [processing, setProcessing] = useState(false);
 
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const picked = e.target.files?.[0];
     // Allow re-picking the exact same file (a Retake that lands on the same shot).
     e.target.value = "";
+    if (!picked) return;
+    const { accepted } = partitionAcceptedImages([picked]);
+    const file = accepted[0];
+    if (!file) {
+      toast.error("Only JPG and PNG images can be uploaded.");
+      return;
+    }
     // Downscaled before it ever reaches the form — a phone original is several
     // MB, which is what made saving a record with a photo feel slow. Decoding
     // and redrawing a big photo takes a visible moment on a phone, so the tile
@@ -51,7 +58,7 @@ export function PhotoCapture({ label, required, onCapture, className, initialPre
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_TYPES}
         capture="environment"
         className="hidden"
         onChange={handleChange}

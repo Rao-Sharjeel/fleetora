@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { Camera, RefreshCcw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getCroppedImageFile } from "@/lib/crop-image";
+import { ACCEPTED_IMAGE_TYPES, getCroppedImageFile, partitionAcceptedImages } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
 
 interface PersonPhotoCaptureProps {
@@ -34,8 +35,14 @@ export function PersonPhotoCapture({ label, required, onCapture, className, init
   const [saving, setSaving] = useState(false);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const picked = e.target.files?.[0];
+    if (!picked) return;
+    const file = partitionAcceptedImages([picked]).accepted[0];
+    if (!file) {
+      toast.error("Only JPG and PNG images can be uploaded.");
+      e.target.value = "";
+      return;
+    }
     setRawImage(URL.createObjectURL(file));
     setCrop({ x: 0, y: 0 });
     setZoom(1);
@@ -66,7 +73,7 @@ export function PersonPhotoCapture({ label, required, onCapture, className, init
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_TYPES}
         capture="environment"
         className="hidden"
         onChange={handleChange}

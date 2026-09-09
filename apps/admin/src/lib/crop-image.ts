@@ -12,6 +12,26 @@ const MAX_OUTPUT_SIZE = 480;
 // — but a phone's full-size original is still far more than anything renders.
 const MAX_PHOTO_EDGE = 1280;
 
+/** Mirrors common.serializers.Base64ImageField.ALLOWED_FORMATS — the backend
+ * rejects anything else, so the picker shouldn't offer it. */
+export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png";
+
+const ACCEPTED_MIME = new Set(["image/jpeg", "image/jpg", "image/png"]);
+
+/**
+ * Filters a picked file list down to the formats the API accepts, returning
+ * what was rejected so the caller can say so. `accept` on the input is only a
+ * hint — a file can still arrive through "All Files" or a drag-and-drop.
+ */
+export function partitionAcceptedImages(files: File[]): { accepted: File[]; rejected: File[] } {
+  const accepted: File[] = [];
+  const rejected: File[] = [];
+  for (const file of files) {
+    (ACCEPTED_MIME.has(file.type.toLowerCase()) ? accepted : rejected).push(file);
+  }
+  return { accepted, rejected };
+}
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();

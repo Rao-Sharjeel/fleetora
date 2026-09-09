@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
-import { resizeImageFile } from "@/lib/crop-image";
+import { ACCEPTED_IMAGE_TYPES, partitionAcceptedImages, resizeImageFile } from "@/lib/crop-image";
 import { fileToDataUrl } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -34,10 +34,20 @@ export function PhotoGalleryCapture({ label, value, onChange, max, className }: 
     e.target.value = ""; // allow re-picking the same file
     if (!picked.length) return;
 
+    const { accepted: usable, rejected } = partitionAcceptedImages(picked);
+    if (rejected.length) {
+      toast.error(
+        rejected.length === picked.length
+          ? "Only JPG and PNG images can be uploaded."
+          : `${rejected.length} file(s) skipped — only JPG and PNG can be uploaded.`,
+      );
+    }
+    if (!usable.length) return;
+
     // Silently dropping the rest of a larger selection would look like a bug.
-    const accepted = picked.slice(0, remaining);
-    if (picked.length > accepted.length) {
-      toast.warning(`Only ${accepted.length} of ${picked.length} photos added — the limit is ${max}.`);
+    const accepted = usable.slice(0, remaining);
+    if (usable.length > accepted.length) {
+      toast.warning(`Only ${accepted.length} of ${usable.length} photos added — the limit is ${max}.`);
     }
     setProcessing(accepted.length);
     try {
@@ -67,7 +77,7 @@ export function PhotoGalleryCapture({ label, value, onChange, max, className }: 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPTED_IMAGE_TYPES}
         multiple
         className="hidden"
         onChange={handleChange}

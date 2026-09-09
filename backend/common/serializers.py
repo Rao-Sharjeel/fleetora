@@ -4,6 +4,7 @@ import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.base import ContentFile
+from PIL import Image
 from rest_framework import serializers
 
 from common.models import FleetSettings
@@ -22,6 +23,12 @@ class Base64ImageField(serializers.ImageField):
     needed anywhere in the API. Mirrors ReadOdometerSerializer's base64
     handling in fleet/serializers.py, generalized into a reusable field."""
 
+    # Pillow opens far more than this (GIF, WebP, BMP, TIFF...), so without an
+    # explicit allowlist any of them would be stored and then served to a
+    # browser. Photo formats only, and no animation.
+    ALLOWED_FORMATS = {"JPEG", "PNG"}
+    _EXTENSIONS = {"JPEG": "jpg", "PNG": "png"}
+
     def to_internal_value(self, data):
         if isinstance(data, str):
             content_type = "image/jpeg"
@@ -34,7 +41,33 @@ class Base64ImageField(serializers.ImageField):
                 raise serializers.ValidationError("Not valid base64 image data.") from exc
             ext = content_type.split("/")[-1] or "jpg"
             data = ContentFile(decoded, name=f"{uuid.uuid4()}.{ext}")
-        return super().to_internal_value(data)
+
+        file_object = super().to_internal_value(data)
+        self._reject_unsupported_format(file_object)
+        return file_object
+
+    def _reject_unsupported_format(self, file_object) -> None:
+        """Checks the decoded bytes, not the declared MIME type or file
+        extension — both are client-supplied and can say anything."""
+        image_format = getattr(getattr(file_object, "image", None), "format", None)
+        if image_format is None:
+            file_object.seek(0)
+            try:
+                with Image.open(file_object) as image:
+                    image_format = image.format
+            except Exception as exc:  # noqa: BLE001 - anything unreadable is invalid
+                raise serializers.ValidationError("Not a readable image file.") from exc
+            finally:
+                file_object.seek(0)
+
+        if image_format not in self.ALLOWED_FORMATS:
+            raise serializers.ValidationError(
+                f"{image_format or 'This'} images aren't supported — use a JPG or PNG."
+            )
+        # A correct extension matters because the stored file is served straight
+        # back to the browser, which trusts it over the bytes.
+        base_name = file_object.name.rsplit(".", 1)[0] if "." in file_object.name else file_object.name
+        file_object.name = f"{base_name}.{self._EXTENSIONS[image_format]}"
 
 
 class SafePrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
