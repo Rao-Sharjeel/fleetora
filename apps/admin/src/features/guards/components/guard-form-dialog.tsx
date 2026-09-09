@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Pencil, Plus } from "lucide-react";
+import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
 import { PersonPhotoCapture } from "@/components/shared/person-photo-capture";
@@ -94,14 +94,17 @@ export function GuardFormDialog({ mode, guard }: GuardFormDialogProps) {
     defaultValues: mode === "edit" && guard ? guardToFormValues(guard) : emptyDefaults,
   });
 
+  const isPending = createGuard.isPending || updateGuard.isPending;
+
   function handleOpenChange(next: boolean) {
+    // Radix routes Escape, outside-click and the X button all through here, so
+    // this one guard keeps the dialog from being dismissed mid-save.
+    if (!next && isPending) return;
     if (next) {
       form.reset(mode === "edit" && guard ? guardToFormValues(guard) : emptyDefaults);
     }
     setOpen(next);
   }
-
-  const isPending = createGuard.isPending || updateGuard.isPending;
 
   async function onSubmit(values: FormValues) {
     const payload = { ...values, assignedGateId: values.assignedGateId || undefined };
@@ -137,6 +140,9 @@ export function GuardFormDialog({ mode, guard }: GuardFormDialogProps) {
           <DialogTitle>{mode === "edit" ? "Edit Security Guard" : "Add Security Guard"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          {/* `contents` keeps the flex layout intact while the disabled
+              fieldset locks every control inside during a save. */}
+          <fieldset disabled={isPending} className="contents">
           <div className="grid gap-4 sm:grid-cols-2">
             <PersonPhotoCapture
               label="Guard Photo"
@@ -217,9 +223,11 @@ export function GuardFormDialog({ mode, guard }: GuardFormDialogProps) {
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {isPending ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Guard"}
             </Button>
           </DialogFooter>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

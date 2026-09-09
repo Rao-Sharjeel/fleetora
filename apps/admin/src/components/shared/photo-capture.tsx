@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resizeImageFile } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
 
 interface PhotoCaptureProps {
@@ -22,11 +23,16 @@ export function PhotoCapture({ label, required, onCapture, className, initialPre
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(initialPreviewUrl ?? null);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
-    onCapture?.(file);
+    // Allow re-picking the exact same file (a Retake that lands on the same shot).
+    e.target.value = "";
+    // Downscaled before it ever reaches the form — a phone original is several
+    // MB, which is what made saving a record with a photo feel slow.
+    const resized = await resizeImageFile(file);
+    setPreview(URL.createObjectURL(resized));
+    onCapture?.(resized);
   }
 
   return (

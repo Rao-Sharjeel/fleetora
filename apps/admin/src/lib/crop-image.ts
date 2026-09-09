@@ -7,12 +7,33 @@ import type { Area } from "react-easy-crop";
 // shrink it back down in CSS every time it's displayed.
 const MAX_OUTPUT_SIZE = 480;
 
+// Non-cropped captures (vehicle photos, odometer/receipt evidence shots) keep
+// more resolution than a badge photo — an odometer reading has to stay legible
+// — but a phone's full-size original is still far more than anything renders.
+const MAX_PHOTO_EDGE = 1280;
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.addEventListener("load", () => resolve(image));
     image.addEventListener("error", reject);
     image.src = url;
+  });
+}
+
+function canvasToJpegFile(canvas: HTMLCanvasElement, fileName: string, quality: number): Promise<File> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Failed to export image."));
+          return;
+        }
+        resolve(new File([blob], fileName, { type: "image/jpeg" }));
+      },
+      "image/jpeg",
+      quality,
+    );
   });
 }
 
@@ -44,17 +65,33 @@ export async function getCroppedImageFile(
     outputSize,
   );
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject(new Error("Failed to export cropped image."));
-          return;
-        }
-        resolve(new File([blob], fileName, { type: "image/jpeg" }));
-      },
-      "image/jpeg",
-      0.92,
-    );
-  });
+  return canvasToJpegFile(canvas, fileName, 0.92);
+}
+
+/** Downscales `file` so its longest edge is at most `maxEdge`, preserving aspect
+ * ratio. Returns the original file untouched when it's already small enough (no
+ * pointless re-encode) or when the browser can't decode it (e.g. HEIC in Chrome)
+ * — uploading the original is no worse than today, and the backend validates it. */
+export async function resizeImageFile(file: File, maxEdge = MAX_PHOTO_EDGE): Promise<File> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(objectUrl);
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    if (scale === 1) return file;
+
+    const width = Math.round(image.naturalWidth * scale);
+    const height = Math.round(image.naturalHeight * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+
+    ctx.drawImage(image, 0, 0, width, height);
+    return await canvasToJpegFile(canvas, file.name, 0.85);
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }

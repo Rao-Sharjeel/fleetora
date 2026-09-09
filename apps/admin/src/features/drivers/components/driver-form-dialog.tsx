@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Pencil, Plus, User, BadgeCheck, Car, ShieldCheck } from "lucide-react";
+import { Pencil, Plus, User, BadgeCheck, Car, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
 import { PersonPhotoCapture } from "@/components/shared/person-photo-capture";
@@ -143,14 +143,17 @@ export function DriverFormDialog({ mode, driver }: DriverFormDialogProps) {
     defaultValues: mode === "edit" && driver ? driverToFormValues(driver) : emptyDefaults,
   });
 
+  const isPending = createDriver.isPending || updateDriver.isPending;
+
   function handleOpenChange(next: boolean) {
+    // Radix routes Escape, outside-click and the X button all through here, so
+    // this one guard keeps the dialog from being dismissed mid-save.
+    if (!next && isPending) return;
     if (next) {
       form.reset(mode === "edit" && driver ? driverToFormValues(driver) : emptyDefaults);
     }
     setOpen(next);
   }
-
-  const isPending = createDriver.isPending || updateDriver.isPending;
 
   async function onSubmit(values: FormValues) {
     const { uniformIssued, idCardIssued, rfidAccessCard, nightDutyAllowed, ...rest } = values;
@@ -199,6 +202,9 @@ export function DriverFormDialog({ mode, driver }: DriverFormDialogProps) {
         <div className="flex flex-1 overflow-hidden">
           <FormModalNav sections={DRIVER_SECTIONS} activeId={activeId} />
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
+            {/* `contents` keeps the flex layout intact while the disabled
+                fieldset locks every control inside during a save. */}
+            <fieldset disabled={isPending} className="contents">
             <FormModalBody containerRef={containerRef}>
               <FormSection
                 id="personal"
@@ -371,9 +377,11 @@ export function DriverFormDialog({ mode, driver }: DriverFormDialogProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isPending ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Driver"}
               </Button>
             </FormModalFooter>
+            </fieldset>
           </form>
         </div>
       </FullScreenDialogContent>

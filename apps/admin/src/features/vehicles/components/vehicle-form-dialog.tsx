@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Pencil, Plus, Car, Settings2, Building2, Gauge, Wrench } from "lucide-react";
+import { Pencil, Plus, Car, Settings2, Building2, Gauge, Loader2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
 import { PhotoCapture } from "@/components/shared/photo-capture";
@@ -146,14 +146,17 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
     defaultValues: mode === "edit" && vehicle ? vehicleToFormValues(vehicle) : emptyDefaults,
   });
 
+  const isPending = createVehicle.isPending || updateVehicle.isPending;
+
   function handleOpenChange(next: boolean) {
+    // Radix routes Escape, outside-click and the X button all through here, so
+    // this one guard keeps the dialog from being dismissed mid-save.
+    if (!next && isPending) return;
     if (next) {
       form.reset(mode === "edit" && vehicle ? vehicleToFormValues(vehicle) : emptyDefaults);
     }
     setOpen(next);
   }
-
-  const isPending = createVehicle.isPending || updateVehicle.isPending;
 
   async function onSubmit(values: FormValues) {
     try {
@@ -196,6 +199,9 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
         <div className="flex flex-1 overflow-hidden">
           <FormModalNav sections={VEHICLE_SECTIONS} activeId={activeId} />
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
+            {/* `contents` keeps the flex layout intact while the disabled
+                fieldset locks every control inside during a save. */}
+            <fieldset disabled={isPending} className="contents">
             <FormModalBody containerRef={containerRef}>
               <FormSection
                 id="identity"
@@ -345,9 +351,11 @@ export function VehicleFormDialog({ mode, vehicle }: VehicleFormDialogProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
+                {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isPending ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Vehicle"}
               </Button>
             </FormModalFooter>
+            </fieldset>
           </form>
         </div>
       </FullScreenDialogContent>
