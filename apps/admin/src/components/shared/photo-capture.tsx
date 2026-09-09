@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Camera, RefreshCcw } from "lucide-react";
+import { Camera, Loader2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resizeImageFile } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ interface PhotoCaptureProps {
 export function PhotoCapture({ label, required, onCapture, className, initialPreviewUrl }: PhotoCaptureProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(initialPreviewUrl ?? null);
+  const [processing, setProcessing] = useState(false);
 
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -29,10 +30,17 @@ export function PhotoCapture({ label, required, onCapture, className, initialPre
     // Allow re-picking the exact same file (a Retake that lands on the same shot).
     e.target.value = "";
     // Downscaled before it ever reaches the form — a phone original is several
-    // MB, which is what made saving a record with a photo feel slow.
-    const resized = await resizeImageFile(file);
-    setPreview(URL.createObjectURL(resized));
-    onCapture?.(resized);
+    // MB, which is what made saving a record with a photo feel slow. Decoding
+    // and redrawing a big photo takes a visible moment on a phone, so the tile
+    // reports it rather than sitting there looking like nothing happened.
+    setProcessing(true);
+    try {
+      const resized = await resizeImageFile(file);
+      setPreview(URL.createObjectURL(resized));
+      onCapture?.(resized);
+    } finally {
+      setProcessing(false);
+    }
   }
 
   return (
@@ -48,7 +56,12 @@ export function PhotoCapture({ label, required, onCapture, className, initialPre
         className="hidden"
         onChange={handleChange}
       />
-      {preview ? (
+      {processing ? (
+        <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-input bg-muted/40 text-muted-foreground">
+          <Loader2 className="h-7 w-7 animate-spin" />
+          <span className="text-sm font-medium">Processing photo…</span>
+        </div>
+      ) : preview ? (
         <div className="relative overflow-hidden rounded-lg border border-border">
           <img src={preview} alt={label} className="h-40 w-full object-cover" />
           <Button

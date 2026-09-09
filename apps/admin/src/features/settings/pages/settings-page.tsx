@@ -132,7 +132,12 @@ function MaintenanceThresholdsCard() {
               </FormField>
             </div>
             <div>
-              <Button onClick={handleSave} disabled={updateThresholds.isPending || !isValid}>
+              <Button
+                onClick={handleSave}
+                disabled={!isValid}
+                loading={updateThresholds.isPending}
+                loadingText="Saving…"
+              >
                 Save Thresholds
               </Button>
             </div>

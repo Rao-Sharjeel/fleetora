@@ -342,7 +342,14 @@ export function GateOutPage() {
             </CardContent>
           </Card>
 
-          <Button size="touch" className="w-full" onClick={handleConfirm} disabled={gateOut.isPending || allowed !== true}>
+          <Button
+            size="touch"
+            className="w-full"
+            onClick={handleConfirm}
+            disabled={allowed !== true}
+            loading={gateOut.isPending}
+            loadingText="Confirming…"
+          >
             Confirm Vehicle Out
           </Button>
         </>

@@ -125,7 +125,7 @@ export function KioskDevicesPage() {
                   <Input {...form.register("name")} placeholder="e.g. Exit Tablet — Main Gate" />
                 </FormField>
                 <DialogFooter>
-                  <Button type="submit" disabled={createDevice.isPending}>
+                  <Button type="submit" loading={createDevice.isPending} loadingText="Creating…">
                     Create
                   </Button>
                 </DialogFooter>

@@ -145,7 +145,11 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
               <form key={editingId ?? "new"} onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
                 <div className="grid gap-4 sm:grid-cols-2">{renderFields(form)}</div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createRecord.isPending || updateRecord.isPending}>
+                  <Button
+                    type="submit"
+                    loading={createRecord.isPending || updateRecord.isPending}
+                    loadingText="Saving…"
+                  >
                     Save
                   </Button>
                 </DialogFooter>

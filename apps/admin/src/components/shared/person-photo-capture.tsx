@@ -131,8 +131,14 @@ export function PersonPhotoCapture({ label, required, onCapture, className, init
             <Button type="button" variant="outline" onClick={() => setCropperOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" onClick={confirmCrop} disabled={saving || !croppedAreaPixels}>
-              {saving ? "Saving…" : "Use Photo"}
+            <Button
+              type="button"
+              onClick={confirmCrop}
+              disabled={!croppedAreaPixels}
+              loading={saving}
+              loadingText="Saving…"
+            >
+              Use Photo
             </Button>
           </DialogFooter>
         </DialogContent>

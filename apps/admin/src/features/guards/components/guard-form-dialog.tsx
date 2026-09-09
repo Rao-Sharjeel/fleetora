@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { FormField } from "@/components/shared/form-field";
 import { PersonPhotoCapture } from "@/components/shared/person-photo-capture";
@@ -222,9 +222,8 @@ export function GuardFormDialog({ mode, guard }: GuardFormDialogProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isPending ? "Saving…" : mode === "edit" ? "Save Changes" : "Add Guard"}
+            <Button type="submit" loading={isPending} loadingText="Saving…">
+              {mode === "edit" ? "Save Changes" : "Add Guard"}
             </Button>
           </DialogFooter>
           </fieldset>

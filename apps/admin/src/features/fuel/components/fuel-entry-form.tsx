@@ -151,7 +151,13 @@ export function FuelEntryForm({ onSaved }: { onSaved?: () => void }) {
 
           <PhotoCapture label="Fuel receipt" />
 
-          <Button size="touch" className="w-full" onClick={handleSave} disabled={createFuelEntry.isPending}>
+          <Button
+            size="touch"
+            className="w-full"
+            onClick={handleSave}
+            loading={createFuelEntry.isPending}
+            loadingText="Saving…"
+          >
             Save Fuel Entry
           </Button>
         </>

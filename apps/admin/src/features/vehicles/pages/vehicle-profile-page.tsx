@@ -129,7 +129,13 @@ export function VehicleProfilePage() {
             {canWrite && (
               <>
                 <VehicleFormDialog mode="edit" vehicle={vehicle} />
-                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteVehicle.isPending}>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDelete}
+                  loading={deleteVehicle.isPending}
+                  loadingText="Deleting…"
+                >
                   <Trash2 className="h-4 w-4" /> Delete
                 </Button>
               </>
@@ -174,7 +180,7 @@ export function VehicleProfilePage() {
             </FormField>
           )}
           <DialogFooter>
-            <Button onClick={saveExitAccess} disabled={setAllowedToExit.isPending}>
+            <Button onClick={saveExitAccess} loading={setAllowedToExit.isPending} loadingText="Saving…">
               Save
             </Button>
           </DialogFooter>

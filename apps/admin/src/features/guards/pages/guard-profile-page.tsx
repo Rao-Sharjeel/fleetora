@@ -65,7 +65,13 @@ export function GuardProfilePage() {
           {canWrite && (
             <>
               <GuardFormDialog mode="edit" guard={guard} />
-              <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteGuard.isPending}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                loading={deleteGuard.isPending}
+                loadingText="Deleting…"
+              >
                 <Trash2 className="h-4 w-4" /> Delete
               </Button>
             </>

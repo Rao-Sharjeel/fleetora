@@ -144,7 +144,7 @@ export function MaintenancePage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleSave} disabled={createRecord.isPending}>
+                <Button onClick={handleSave} loading={createRecord.isPending} loadingText="Saving…">
                   Save Maintenance
                 </Button>
               </DialogFooter>

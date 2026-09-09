@@ -163,7 +163,13 @@ export function GateInPage() {
             </CardContent>
           </Card>
 
-          <Button size="touch" className="w-full" onClick={handleComplete} disabled={gateIn.isPending}>
+          <Button
+            size="touch"
+            className="w-full"
+            onClick={handleComplete}
+            loading={gateIn.isPending}
+            loadingText="Completing…"
+          >
             Complete Gate-In
           </Button>
         </>

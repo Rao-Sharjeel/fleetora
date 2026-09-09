@@ -138,7 +138,7 @@ export function RequisitionsPage() {
                   <Input {...form.register("approver")} placeholder="e.g. Fleet Manager" />
                 </FormField>
                 <DialogFooter>
-                  <Button type="submit" disabled={createRequisition.isPending}>
+                  <Button type="submit" loading={createRequisition.isPending} loadingText="Submitting…">
                     Submit Requisition
                   </Button>
                 </DialogFooter>

@@ -169,7 +169,11 @@ export function UsersPage() {
                   </FormField>
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={createUser.isPending || updateUser.isPending}>
+                  <Button
+                    type="submit"
+                    loading={createUser.isPending || updateUser.isPending}
+                    loadingText="Saving…"
+                  >
                     Save
                   </Button>
                 </DialogFooter>
