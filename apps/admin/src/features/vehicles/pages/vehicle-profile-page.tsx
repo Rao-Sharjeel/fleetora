@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
-import { QrCode, ShieldCheck, ShieldX } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { QrCode, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,10 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { InfoCard, ListCard } from "@/components/shared/profile-cards";
-import { PhotoCapture } from "@/components/shared/photo-capture";
 import { FormField } from "@/components/shared/form-field";
 import { printVehicleQrLabel } from "@/lib/qr-print";
-import { useVehicle, useSetAllowedToExit } from "@/features/vehicles/hooks";
+import { useVehicle, useSetAllowedToExit, useDeleteVehicle } from "@/features/vehicles/hooks";
+import { VehicleFormDialog } from "@/features/vehicles/components/vehicle-form-dialog";
 import { useDriver } from "@/features/drivers/hooks";
 import { useTrips } from "@/features/trips/hooks";
 import { useFuelEntries } from "@/features/fuel/hooks";
@@ -29,9 +29,12 @@ import { useDocuments } from "@/features/documents/hooks";
 import { useAuditLog } from "@/features/audit/hooks";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
 import { useMasterCollection } from "@/features/master-data/hooks";
+import { useSession } from "@/hooks/use-session";
 
 export function VehicleProfilePage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
+  const navigate = useNavigate();
+  const role = useSession((s) => s.role);
   const { data: vehicle } = useVehicle(vehicleId);
   const { data: driver } = useDriver(vehicle?.assignedDriverId);
   const { data: trips = [] } = useTrips();
@@ -43,11 +46,26 @@ export function VehicleProfilePage() {
   const { data: documentTypes = [] } = useMasterCollection("documentTypes");
 
   const setAllowedToExit = useSetAllowedToExit();
+  const deleteVehicle = useDeleteVehicle();
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
   const [allowedDraft, setAllowedDraft] = useState(true);
   const [reasonDraft, setReasonDraft] = useState("");
 
   if (!vehicle) return <p className="text-sm text-muted-foreground">Loading vehicle…</p>;
+
+  const canWrite = role === "admin" || role === "fleet_manager";
+
+  async function handleDelete() {
+    if (!vehicle) return;
+    if (!window.confirm(`Delete "${vehicle.registrationNumber}"? This can't be undone.`)) return;
+    try {
+      await deleteVehicle.mutateAsync(vehicle.id);
+      toast.success(`${vehicle.registrationNumber} deleted.`);
+      navigate("/vehicles");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete vehicle.");
+    }
+  }
 
   function openExitDialog() {
     setAllowedDraft(vehicle!.allowedToExit);
@@ -108,6 +126,14 @@ export function VehicleProfilePage() {
               {vehicle.allowedToExit ? "Allowed to Exit" : "Exit Blocked"}
             </Button>
             <StatusBadge status={vehicle.status} />
+            {canWrite && (
+              <>
+                <VehicleFormDialog mode="edit" vehicle={vehicle} />
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteVehicle.isPending}>
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -164,30 +190,40 @@ export function VehicleProfilePage() {
           <TabsTrigger value="tyres">Tyres</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="costs">Costs</TabsTrigger>
-          <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <InfoCard title="Make / Model" value={`${vehicle.make} ${vehicle.model} ${vehicle.variant ?? ""}`} />
-            <InfoCard title="Year / Colour" value={`${vehicle.year} · ${vehicle.colour}`} />
-            <InfoCard title="Fuel Type" value={vehicle.fuelType} />
-            <InfoCard title="Company" value={vehicle.company} />
-            <InfoCard title="Department" value={vehicle.departmentCostCentre ?? "—"} />
-            <InfoCard title="Expected Fuel Average" value={`${vehicle.expectedFuelAverageKmpl} KM/L`} />
-            {vehicle.seatingCapacity != null && (
-              <InfoCard title="Seating Capacity" value={`${vehicle.seatingCapacity}`} />
-            )}
-            {vehicle.transmission && <InfoCard title="Transmission" value={vehicle.transmission} />}
-            {vehicle.driveType && <InfoCard title="Drive Type" value={vehicle.driveType} />}
-            {vehicle.bodyType && <InfoCard title="Body Type" value={vehicle.bodyType} />}
-            {vehicle.oilChangeKm != null && (
-              <InfoCard title="Oil Change Every" value={`${formatKm(vehicle.oilChangeKm)}`} />
-            )}
-            {vehicle.tyreChangeKm != null && (
-              <InfoCard title="Tyre Change Due After" value={`${formatKm(vehicle.tyreChangeKm)}`} />
-            )}
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="h-48 w-48 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+              {vehicle.photoUrl ? (
+                <img src={vehicle.photoUrl} alt={vehicle.registrationNumber} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-muted-foreground">
+                  {vehicle.registrationNumber.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <InfoCard title="Make / Model" value={`${vehicle.make} ${vehicle.model} ${vehicle.variant ?? ""}`} />
+              <InfoCard title="Year / Colour" value={`${vehicle.year} · ${vehicle.colour}`} />
+              <InfoCard title="Fuel Type" value={vehicle.fuelType} />
+              <InfoCard title="Company" value={vehicle.company} />
+              <InfoCard title="Department" value={vehicle.departmentCostCentre ?? "—"} />
+              <InfoCard title="Expected Fuel Average" value={`${vehicle.expectedFuelAverageKmpl} KM/L`} />
+              {vehicle.seatingCapacity != null && (
+                <InfoCard title="Seating Capacity" value={`${vehicle.seatingCapacity}`} />
+              )}
+              {vehicle.transmission && <InfoCard title="Transmission" value={vehicle.transmission} />}
+              {vehicle.driveType && <InfoCard title="Drive Type" value={vehicle.driveType} />}
+              {vehicle.bodyType && <InfoCard title="Body Type" value={vehicle.bodyType} />}
+              {vehicle.oilChangeKm != null && (
+                <InfoCard title="Oil Change Every" value={`${formatKm(vehicle.oilChangeKm)}`} />
+              )}
+              {vehicle.tyreChangeKm != null && (
+                <InfoCard title="Tyre Change Due After" value={`${formatKm(vehicle.tyreChangeKm)}`} />
+              )}
+            </div>
           </div>
         </TabsContent>
 
@@ -283,14 +319,6 @@ export function VehicleProfilePage() {
             <InfoCard title="Total Fuel Cost" value={formatCurrency(totalFuelCost)} />
             <InfoCard title="Total Maintenance Cost" value={formatCurrency(totalMaintenanceCost)} />
             <InfoCard title="Cost per KM" value={formatCurrency(Math.round(costPerKm))} />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="photos">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <PhotoCapture label="Front View" />
-            <PhotoCapture label="Rear View" />
-            <PhotoCapture label="Side View" />
           </div>
         </TabsContent>
 

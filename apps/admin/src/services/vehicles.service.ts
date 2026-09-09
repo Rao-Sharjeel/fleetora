@@ -1,5 +1,5 @@
 import type { Vehicle } from "@/types";
-import { ApiError, apiGet, apiList, apiPost } from "@/lib/api-client";
+import { ApiError, apiDelete, apiGet, apiList, apiPatch, apiPost } from "@/lib/api-client";
 
 export async function listVehicles(): Promise<Vehicle[]> {
   return apiList<Vehicle>("/vehicles/");
@@ -18,6 +18,17 @@ export async function createVehicle(payload: CreateVehiclePayload): Promise<Vehi
 
 export async function getVehicle(id: string): Promise<Vehicle | undefined> {
   return apiGet<Vehicle>(`/vehicles/${id}/`);
+}
+
+export type UpdateVehiclePayload = Partial<CreateVehiclePayload>;
+
+export async function updateVehicle(id: string, patch: UpdateVehiclePayload): Promise<Vehicle> {
+  const { allowedToExit: _allowedToExit, ...body } = patch;
+  return apiPatch<Vehicle>(`/vehicles/${id}/`, body);
+}
+
+export async function deleteVehicle(id: string): Promise<void> {
+  return apiDelete(`/vehicles/${id}/`);
 }
 
 export async function getVehicleByCode(code: string): Promise<Vehicle | undefined> {

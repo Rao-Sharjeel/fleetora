@@ -16,7 +16,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     assigned_driver_id = SafePrimaryKeyRelatedField(
         source="assigned_driver", queryset=Driver.objects.all(), required=False, allow_null=True
     )
-    photo_url = serializers.ImageField(source="photo", required=False, allow_null=True)
+    photo_url = Base64ImageField(source="photo", required=False, allow_null=True)
     allowed_to_exit_updated_by = serializers.SerializerMethodField()
 
     class Meta:

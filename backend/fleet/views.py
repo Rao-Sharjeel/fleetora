@@ -50,6 +50,25 @@ class VehicleViewSet(viewsets.ModelViewSet):
             return [READ_HEAVY_OR_GATE_STAFF()]
         return [OPERATIONAL_WRITE()]
 
+    def destroy(self, request, *args, **kwargs):
+        vehicle = self.get_object()
+        # Trip.vehicle/FuelEntry.vehicle are PROTECT (would 500 uncaught), but
+        # MaintenanceRecord.vehicle/DocumentRecord.vehicle are CASCADE — without
+        # this check those would just silently vanish along with the vehicle.
+        # Checking every relation up front covers both cases uniformly.
+        blockers = []
+        if n := vehicle.trips.count():
+            blockers.append(f"{n} trip(s)")
+        if n := vehicle.fuel_entries.count():
+            blockers.append(f"{n} fuel entry(ies)")
+        if n := vehicle.maintenance_records.count():
+            blockers.append(f"{n} maintenance record(s)")
+        if n := vehicle.documents.count():
+            blockers.append(f"{n} document(s)")
+        if blockers:
+            raise ValidationError({"detail": f"Cannot delete this vehicle — it has {', '.join(blockers)} on record."})
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
     def by_code(self, request, code=None):
         """Mirrors vehicles.service.ts getVehicleByCode's 3-way match."""
