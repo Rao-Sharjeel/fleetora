@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import {
   KioskShell,
   CameraView,
@@ -35,6 +36,10 @@ export function CaptureOdometerPage() {
   async function handleCapture(canvas: HTMLCanvasElement, dataUrl: string) {
     setBusy(true);
     setMessage(null);
+    // The OCR runs on the main thread, so without giving the browser a frame
+    // first the "Reading odometer…" state never gets painted — the camera
+    // appeared to stay open for the whole read.
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
       // On-device first: it finds and reads the digits anywhere on the
       // cluster, and needs no round trip. The server stays as the fallback for
@@ -75,7 +80,10 @@ export function CaptureOdometerPage() {
       <p className="text-sm text-kiosk-muted">Point the camera at the instrument cluster — the odometer is found automatically.</p>
       {message && <p className="rounded-lg bg-kiosk-danger/10 p-2 text-center text-sm text-kiosk-danger">{message}</p>}
       {busy ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-kiosk-muted">Reading odometer…</div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-kiosk-muted">
+          <Loader2 className="h-8 w-8 animate-spin text-kiosk-accent" />
+          Reading odometer…
+        </div>
       ) : (
         <CameraView variant="odometer" hint="Get the whole cluster in frame" onCapture={handleCapture} />
       )}

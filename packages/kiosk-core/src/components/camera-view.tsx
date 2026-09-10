@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { decodeQr } from "../lib/barcode";
 import { captureSharpestCrop, mapOverlayToVideoRect } from "../lib/frame-capture";
 
@@ -126,14 +127,21 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     });
   }
 
+  function stopStream() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }
+
   async function capture() {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0 || capturing) return;
     setCapturing(true);
     try {
-      // The frame the operator lines up is what gets sent — previously the
-      // overlay was decorative and the whole dashboard went to the OCR.
       const canvas = await captureSharpestCrop(video, currentCropRect);
+      // Release the camera the moment the frames are in hand. What follows —
+      // OCR — can take seconds, and leaving the stream live keeps the camera
+      // indicator on and the preview moving as though nothing was captured.
+      stopStream();
       if (!canvas) return;
       onCapture(canvas, canvas.toDataURL("image/jpeg", 0.92));
     } finally {
@@ -170,6 +178,12 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           // centre — the band missed it. This outline is guidance only, and
           // nothing is cropped to it.
           <div className="pointer-events-none absolute inset-4 rounded-xl border border-dashed border-kiosk-accent/40" />
+        )}
+        {capturing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70">
+            <Loader2 className="h-8 w-8 animate-spin text-kiosk-accent" />
+            <span className="text-sm text-white">Capturing…</span>
+          </div>
         )}
         {hint && (
           <div className="absolute inset-x-0 bottom-3 flex justify-center">

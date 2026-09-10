@@ -9,14 +9,16 @@ from rest_framework.response import Response
 
 from accounts.permissions import allow_kiosk_or_roles, allow_roles
 from audit.models import AuditLogEntry
-from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle
+from fleet.models import Driver, FuelEntry, Guard, OdometerIssue, Trip, Vehicle
 from fleet.serializers import (
     DriverSerializer,
     FuelEntrySerializer,
     GateInSerializer,
     GateOutSerializer,
     GuardSerializer,
+    OdometerIssueSerializer,
     ReadOdometerSerializer,
+    ResolveOdometerIssueSerializer,
     SetAllowedToExitSerializer,
     TripSerializer,
     VehicleListSerializer,
@@ -144,22 +146,40 @@ class VehicleViewSet(viewsets.ModelViewSet):
             serializer = GateInSerializer(data=request.data, context={"vehicle": vehicle})
             serializer.is_valid(raise_exception=True)
 
-            trip = serializer.validated_data["trip"]
+            data = serializer.validated_data
+            trip = data["trip"]
             trip.in_time = timezone.now()
-            trip.odometer_in = serializer.validated_data["odometer_in"]
-            trip.trip_km = trip.odometer_in - trip.odometer_out
+            trip.odometer_in = data.get("odometer_in")
+            # Only computable once both ends are known; a trip whose opening or
+            # closing reading is still pending gets its distance on resolution.
+            trip.trip_km = (
+                trip.odometer_in - trip.odometer_out
+                if trip.odometer_in is not None and trip.odometer_out is not None
+                else None
+            )
             trip.status = Trip.Status.COMPLETED
-            trip.return_condition = serializer.validated_data["return_condition"]
-            trip.remarks = serializer.validated_data.get("remarks") or trip.remarks
+            trip.return_condition = data["return_condition"]
+            trip.remarks = data.get("remarks") or trip.remarks
             trip.save()
 
-            vehicle.current_odometer = trip.odometer_in
             vehicle.status = (
                 Vehicle.Status.AVAILABLE
                 if trip.return_condition == Trip.ReturnCondition.OK
                 else Vehicle.Status.WORKSHOP
             )
-            vehicle.save(update_fields=["current_odometer", "status"])
+            if trip.odometer_in is not None:
+                vehicle.current_odometer = trip.odometer_in
+                vehicle.save(update_fields=["current_odometer", "status"])
+            else:
+                OdometerIssue.objects.create(
+                    vehicle=vehicle,
+                    trip=trip,
+                    stage=OdometerIssue.Stage.GATE_IN,
+                    photo=data["odometer_issue_photo"],
+                    attempts=data.get("odometer_issue_attempts", 0),
+                    raised_by=trip.guard,
+                )
+                vehicle.save(update_fields=["status"])
 
         return Response(TripSerializer(trip).data)
 
@@ -249,15 +269,29 @@ class TripViewSet(viewsets.ModelViewSet):
                 requested_by=data["requested_by"],
                 department=data["department"],
                 out_time=timezone.now(),
-                odometer_out=data["odometer_out"],
+                odometer_out=data.get("odometer_out"),
                 status=Trip.Status.OPEN,
                 expected_return=data.get("expected_return"),
                 remarks=data.get("remarks", ""),
             )
 
             vehicle.status = Vehicle.Status.OUTSIDE
-            vehicle.current_odometer = data["odometer_out"]
-            vehicle.save(update_fields=["status", "current_odometer"])
+            if data.get("odometer_out") is not None:
+                vehicle.current_odometer = data["odometer_out"]
+                vehicle.save(update_fields=["status", "current_odometer"])
+            else:
+                # The reading is pending an admin, so the vehicle keeps its last
+                # known-good odometer — advancing it to a guess would corrupt
+                # the baseline every later reading is validated against.
+                OdometerIssue.objects.create(
+                    vehicle=vehicle,
+                    trip=trip,
+                    stage=OdometerIssue.Stage.GATE_OUT,
+                    photo=data["odometer_issue_photo"],
+                    attempts=data.get("odometer_issue_attempts", 0),
+                    raised_by_id=data.get("guard_id"),
+                )
+                vehicle.save(update_fields=["status"])
 
         return Response(TripSerializer(trip).data, status=201)
 
@@ -274,3 +308,68 @@ class FuelEntryViewSet(viewsets.ModelViewSet):
         if self.action in ("list", "retrieve"):
             return [READ_HEAVY()]
         return [OPERATIONAL_WRITE()]
+
+
+class OdometerIssueViewSet(viewsets.ReadOnlyModelViewSet):
+    """Odometers a guard could not get read, for an admin to resolve.
+
+    Deliberately read-only plus a single `resolve` action: guards raise these
+    from the gate apps as a side effect of Gate-Out/Gate-In, and nobody edits
+    them by hand. Resolution is admin-side only — the whole point is that the
+    person at the gate is not the one typing the number.
+    """
+
+    queryset = OdometerIssue.objects.select_related("vehicle", "trip", "raised_by", "resolved_by")
+    serializer_class = OdometerIssueSerializer
+    filterset_fields = ["status", "stage", "vehicle"]
+
+    def get_permissions(self):
+        return [OPERATIONAL_WRITE()]
+
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        with transaction.atomic():
+            # No select_related here: `trip` is nullable, so joining it makes
+            # Postgres refuse the row lock ("FOR UPDATE cannot be applied to the
+            # nullable side of an outer join"). The related rows are re-fetched
+            # under their own locks below anyway.
+            issue = get_object_or_404(OdometerIssue.objects.select_for_update(), pk=pk)
+            serializer = ResolveOdometerIssueSerializer(data=request.data, context={"issue": issue})
+            serializer.is_valid(raise_exception=True)
+            reading = serializer.validated_data["reading"]
+
+            vehicle = Vehicle.objects.select_for_update().get(pk=issue.vehicle_id)
+            trip = issue.trip
+            if trip:
+                trip = Trip.objects.select_for_update().get(pk=trip.pk)
+                if issue.stage == OdometerIssue.Stage.GATE_OUT:
+                    trip.odometer_out = reading
+                else:
+                    trip.odometer_in = reading
+                # Now that both ends may be known, the distance can be filled in.
+                if trip.odometer_out is not None and trip.odometer_in is not None:
+                    trip.trip_km = trip.odometer_in - trip.odometer_out
+                trip.save(update_fields=["odometer_out", "odometer_in", "trip_km"])
+
+            # The vehicle's odometer was left at its last known-good value while
+            # this was pending, so it only moves forward now — and only if this
+            # reading is actually newer than whatever has happened since.
+            if reading > vehicle.current_odometer:
+                vehicle.current_odometer = reading
+                vehicle.save(update_fields=["current_odometer"])
+
+            issue.reading = reading
+            issue.status = OdometerIssue.Status.RESOLVED
+            issue.resolved_by = request.user if request.user.is_authenticated else None
+            issue.resolved_at = timezone.now()
+            issue.save(update_fields=["reading", "status", "resolved_by", "resolved_at"])
+
+            AuditLogEntry.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                transaction=f"Odometer reading resolved — {vehicle.registration_number}",
+                previous_value="Unreadable at the gate",
+                new_value=f"{reading} KM",
+                reason=f"{issue.get_stage_display()}{f' — {trip.trip_number}' if trip else ''}",
+            )
+
+        return Response(OdometerIssueSerializer(issue, context={"request": request}).data)

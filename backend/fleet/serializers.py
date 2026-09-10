@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from common.serializers import Base64ImageField, SafePrimaryKeyRelatedField
-from fleet.models import Driver, FuelEntry, Guard, Trip, Vehicle, VehiclePhoto
+from fleet.models import Driver, FuelEntry, Guard, OdometerIssue, Trip, Vehicle, VehiclePhoto
 from masterdata.models import GateMaster
 
 
@@ -327,7 +327,11 @@ class GateOutSerializer(serializers.Serializer):
     vehicle_id = serializers.UUIDField()
     driver_id = serializers.UUIDField()
     guard_id = serializers.UUIDField(required=False, allow_null=True)
-    odometer_out = serializers.IntegerField(min_value=0)
+    # Optional only in exchange for a photo: a guard who cannot get a reading
+    # raises an issue instead, and an admin enters it from the image later.
+    odometer_out = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    odometer_issue_photo = Base64ImageField(required=False, allow_null=True)
+    odometer_issue_attempts = serializers.IntegerField(min_value=0, required=False, default=0)
     purpose = serializers.CharField()
     destination = serializers.CharField()
     requested_by = serializers.CharField()
@@ -345,9 +349,15 @@ class GateOutSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"{vehicle.registration_number} is already outside. Gate-Out is blocked."
             )
-        if attrs["odometer_out"] < vehicle.current_odometer:
+        odometer = attrs.get("odometer_out")
+        if odometer is None:
+            if not attrs.get("odometer_issue_photo"):
+                raise serializers.ValidationError(
+                    {"odometer_out": "Provide a reading, or a photo of the odometer to be resolved later."}
+                )
+        elif odometer < vehicle.current_odometer:
             raise serializers.ValidationError(
-                f"Odometer OUT ({attrs['odometer_out']}) is below the last validated reading "
+                f"Odometer OUT ({odometer}) is below the last validated reading "
                 f"({vehicle.current_odometer}). Authorized override required."
             )
 
@@ -359,7 +369,9 @@ class GateInSerializer(serializers.Serializer):
     """Mirrors trips.service.ts completeGateIn: requires an open trip, rejects odometer regression.
     Expects `vehicle` (already locked via select_for_update by the caller) in context."""
 
-    odometer_in = serializers.IntegerField(min_value=0)
+    odometer_in = serializers.IntegerField(min_value=0, required=False, allow_null=True)
+    odometer_issue_photo = Base64ImageField(required=False, allow_null=True)
+    odometer_issue_attempts = serializers.IntegerField(min_value=0, required=False, default=0)
     return_condition = serializers.ChoiceField(choices=Trip.ReturnCondition.choices)
     remarks = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -368,9 +380,17 @@ class GateInSerializer(serializers.Serializer):
         trip = Trip.objects.select_for_update().filter(vehicle=vehicle, status=Trip.Status.OPEN).first()
         if not trip:
             raise serializers.ValidationError("No open trip found for this vehicle.")
-        if attrs["odometer_in"] < trip.odometer_out:
+        odometer = attrs.get("odometer_in")
+        if odometer is None:
+            if not attrs.get("odometer_issue_photo"):
+                raise serializers.ValidationError(
+                    {"odometer_in": "Provide a reading, or a photo of the odometer to be resolved later."}
+                )
+        # trip.odometer_out is null when the opening reading is itself still
+        # awaiting an admin, so there is nothing to compare against yet.
+        elif trip.odometer_out is not None and odometer < trip.odometer_out:
             raise serializers.ValidationError(
-                f"Closing odometer ({attrs['odometer_in']}) cannot be below opening odometer "
+                f"Closing odometer ({odometer}) cannot be below opening odometer "
                 f"({trip.odometer_out})."
             )
         attrs["trip"] = trip
@@ -400,3 +420,63 @@ class FuelEntrySerializer(serializers.ModelSerializer):
         ]
         # total is derived server-side from litres x rate, never accepted from a client.
         read_only_fields = ["id", "total"]
+
+
+class OdometerIssueSerializer(serializers.ModelSerializer):
+    """An unreadable odometer awaiting an admin's reading."""
+
+    vehicle_id = serializers.UUIDField(source="vehicle.id", read_only=True)
+    registration_number = serializers.CharField(source="vehicle.registration_number", read_only=True)
+    trip_number = serializers.CharField(source="trip.trip_number", read_only=True, default=None)
+    raised_by_name = serializers.CharField(source="raised_by.name", read_only=True, default=None)
+    resolved_by_name = serializers.CharField(source="resolved_by.name", read_only=True, default=None)
+    photo_url = serializers.SerializerMethodField()
+    last_known_odometer = serializers.IntegerField(source="vehicle.current_odometer", read_only=True)
+
+    class Meta:
+        model = OdometerIssue
+        fields = [
+            "id",
+            "vehicle_id",
+            "registration_number",
+            "trip_number",
+            "stage",
+            "photo_url",
+            "attempts",
+            "raised_by_name",
+            "raised_at",
+            "status",
+            "reading",
+            "resolved_by_name",
+            "resolved_at",
+            "last_known_odometer",
+        ]
+        read_only_fields = fields
+
+    def get_photo_url(self, obj: OdometerIssue) -> str | None:
+        if not obj.photo:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.photo.url) if request else obj.photo.url
+
+
+class ResolveOdometerIssueSerializer(serializers.Serializer):
+    """The reading an admin types in from the photo."""
+
+    reading = serializers.IntegerField(min_value=0)
+
+    def validate_reading(self, value):
+        issue: OdometerIssue = self.context["issue"]
+        if issue.status == OdometerIssue.Status.RESOLVED:
+            raise serializers.ValidationError("This reading has already been resolved.")
+
+        # The same monotonicity the gate enforces — a corrected reading still
+        # can't sit below what the vehicle had already travelled.
+        floor = issue.vehicle.current_odometer
+        if issue.stage == OdometerIssue.Stage.GATE_IN and issue.trip and issue.trip.odometer_out is not None:
+            floor = max(floor, issue.trip.odometer_out)
+        if value < floor:
+            raise serializers.ValidationError(
+                f"{value} is below the vehicle's last recorded reading ({floor})."
+            )
+        return value

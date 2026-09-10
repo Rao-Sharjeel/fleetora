@@ -22,6 +22,10 @@ def vehicle_photo_path(instance, filename):
     return f"vehicles/{connection.schema_name}/{instance.vehicle_id}/{filename}"
 
 
+def odometer_issue_photo_path(instance, filename):
+    return f"odometer-issues/{connection.schema_name}/{instance.vehicle_id}/{filename}"
+
+
 class Driver(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active"
@@ -219,7 +223,11 @@ class Trip(models.Model):
     approved_by = models.CharField(max_length=120, blank=True, default="")
     out_time = models.DateTimeField()
     in_time = models.DateTimeField(null=True, blank=True)
-    odometer_out = models.PositiveIntegerField()
+    # Nullable because a guard can report an unreadable odometer instead of
+    # entering a number: the trip proceeds and an admin fills the reading in
+    # from the photo. Storing the vehicle's last reading as a stand-in would
+    # look like a real measurement in every report that touched it.
+    odometer_out = models.PositiveIntegerField(null=True, blank=True)
     odometer_in = models.PositiveIntegerField(null=True, blank=True)
     trip_km = models.PositiveIntegerField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
@@ -235,6 +243,59 @@ class Trip(models.Model):
 
     def __str__(self) -> str:
         return self.trip_number
+
+
+class OdometerIssue(models.Model):
+    """An odometer a guard could not get read, raised for an admin to resolve.
+
+    Guards are not allowed to type readings in themselves — that is the whole
+    point of scanning one — so when the OCR keeps failing they photograph the
+    cluster and hand it to someone who can enter it from the desk. Until then
+    the reading it belongs to stays empty rather than holding a guess.
+    """
+
+    class Stage(models.TextChoices):
+        GATE_OUT = "gate_out"
+        GATE_IN = "gate_in"
+        FUEL = "fuel"
+
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        RESOLVED = "resolved"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="odometer_issues")
+    # Exactly one of these is set, matching `stage`.
+    trip = models.ForeignKey("Trip", null=True, blank=True, on_delete=models.CASCADE, related_name="odometer_issues")
+    fuel_entry = models.ForeignKey(
+        "FuelEntry", null=True, blank=True, on_delete=models.CASCADE, related_name="odometer_issues"
+    )
+    stage = models.CharField(max_length=10, choices=Stage.choices)
+    photo = models.ImageField(upload_to=odometer_issue_photo_path)
+    # How many reads the guard tried before giving up — useful for spotting a
+    # cluster that always fails, or a device with a bad camera.
+    attempts = models.PositiveSmallIntegerField(default=0)
+    raised_by = models.ForeignKey(Guard, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    raised_at = models.DateTimeField(auto_now_add=True)
+
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reading = models.PositiveIntegerField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-raised_at"]
+
+    def __str__(self) -> str:
+        return f"{self.get_stage_display()} odometer issue — {self.vehicle_id} ({self.status})"
+
+
+@receiver(models.signals.post_delete, sender=OdometerIssue)
+def delete_odometer_issue_photo(sender, instance, **kwargs):
+    if instance.photo:
+        instance.photo.delete(save=False)
 
 
 class FuelEntry(models.Model):
