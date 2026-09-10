@@ -22,6 +22,32 @@ never produce:
 
 So: re-score here against real samples before changing anything about the OCR.
 
+## Current results (7 real photos)
+
+| | correct | wrong | declined |
+|---|---|---|---|
+| detection + padding + variant agreement | **6** | **0** | 1 |
+| Tesseract on the full photo (production today) | 1 | 6 | 0 |
+
+The single decline is a mechanical drum caught mid-roll, where the last digit
+is genuinely ambiguous. Three fixes came from real photos and none of them
+were visible in synthetic tests:
+
+- **Pad the detected box.** PP-OCR's boxes hug the glyphs; one that shaved the
+  digits read `376785` for `316785` at 0.95 confidence — a wrong value *higher*
+  than the true one, so the last-reading filter would have passed it.
+- **Compare candidates as numbers, not strings.** Padding sometimes drags a
+  label edge in, decoding as a leading zero (`0389775` for `389775`). Same
+  odometer value; comparing ints both fixes the read and lets variants agree.
+- **Require agreement across crop/contrast variants.** Near a decision boundary
+  the answer flips under small changes, which is exactly when it shouldn't be
+  trusted.
+
+Per-digit confidence localises errors well: on the one misread, the wrong digit
+scored 0.746 while every correct digit across all photos scored >= 0.993, and
+the true digit was the runner-up. That supports asking the operator to confirm
+a single highlighted digit rather than re-check the whole number.
+
 ## Setup
 
 ```bash

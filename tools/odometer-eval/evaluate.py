@@ -34,7 +34,7 @@ sys.path.insert(0, str(REPO / "backend"))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fleetora.settings.dev")
 
 import numpy as np  # noqa: E402
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageEnhance  # noqa: E402
 
 MODELS = REPO / "node_modules/@gutenye/ocr-models/assets"
 DET_MODEL = MODELS / "ch_PP-OCRv4_det_infer.onnx"
@@ -50,6 +50,10 @@ MIN_CHAR_PROB = 0.30
 
 # An odometer is realistically 4-7 digits (fleet/services.py uses the same).
 MIN_DIGITS, MAX_DIGITS = 4, 7
+
+# Fraction of crop variants that must agree before a reading is trusted.
+# Tuned on a small sample: prefer a retake over a wrong number.
+MIN_VARIANT_AGREEMENT = 5 / 6
 
 TRUTH_RE = re.compile(r"(\d{4,7})(?=\.[A-Za-z0-9]+$)")
 
@@ -163,28 +167,78 @@ class Engine:
             boxes.append((int(x1), int(y1), int(x2), int(y2), score))
         return boxes
 
+    def crop_variants(self, img: Image.Image, box: tuple[int, int, int, int]) -> list[Image.Image]:
+        """Several readings of the same box, at different padding and contrast.
+
+        Two measured reasons. The detector's boxes hug the glyphs, and one that
+        shaved the digits turned a "1" into a "7" at 0.95 confidence — padding
+        fixes that. And when the crop sits near a decision boundary the answer
+        flips under small changes, so disagreement between variants is a usable
+        signal that the read shouldn't be trusted.
+        """
+        x1, y1, x2, y2 = box
+        w, h = x2 - x1, y2 - y1
+        W, H = img.size
+        out = []
+        for pad_x, pad_y in ((0.02, 0.10), (0.04, 0.25), (0.06, 0.40)):
+            crop = img.crop(
+                (
+                    max(0, int(x1 - w * pad_x)),
+                    max(0, int(y1 - h * pad_y)),
+                    min(W, int(x2 + w * pad_x)),
+                    min(H, int(y2 + h * pad_y)),
+                )
+            )
+            out.append(crop)
+            out.append(ImageEnhance.Contrast(crop).enhance(2.0))
+        return out
+
     def read_by_detection(self, img: Image.Image, last_odometer: int | None) -> tuple[Reading, list]:
         """Find every text line, then choose the one that looks like an odometer.
 
-        This is the approach that removes the dependency on where the operator
-        aims: on a digital cluster it picked the odometer out of a QR sticker,
-        a range readout and an outside-temperature readout.
+        Removes the dependency on where the operator aims: on a digital cluster
+        it picked the odometer out of a QR sticker, a range readout and an
+        outside-temperature readout.
         """
-        candidates = []
+        from collections import Counter
+
+        candidates: list[Reading] = []
+        scored: list[tuple[int, float, int, int]] = []
         for x1, y1, x2, y2, _score in self.detect(img):
-            reading = self.recognise(img.crop((x1, y1, x2, y2)))
-            if reading.text:
-                candidates.append(reading)
+            values: list[int] = []
+            confidences: dict[int, float] = {}
+            for variant in self.crop_variants(img, (x1, y1, x2, y2)):
+                reading = self.recognise(variant)
+                if not reading.text or not MIN_DIGITS <= len(reading.text) <= MAX_DIGITS + 1:
+                    continue
+                # Compared as numbers, not strings: padding sometimes drags a
+                # label edge into the crop and it decodes as a leading zero
+                # ("0389775" for 389775), which is the same odometer value.
+                value = int(reading.text)
+                values.append(value)
+                confidences[value] = max(confidences.get(value, 0.0), reading.confidence)
+            if not values:
+                continue
+            best, agreement = Counter(values).most_common(1)[0]
+            candidates.append(Reading(str(best), confidences[best]))
+            scored.append((best, confidences[best], agreement, len(values)))
 
         plausible = [
-            c
-            for c in candidates
-            if MIN_DIGITS <= len(c.text) <= MAX_DIGITS
-            and (last_odometer is None or int(c.text) >= last_odometer)
+            s
+            for s in scored
+            if MIN_DIGITS <= len(str(s[0])) <= MAX_DIGITS
+            and (last_odometer is None or s[0] >= last_odometer)
         ]
-        plausible.sort(key=lambda c: -c.confidence)
-        best = plausible[0] if plausible else Reading(None, 0.0)
-        return best, candidates
+        # Agreement first, confidence only as a tie-break: on one photo two
+        # speedo dial numbers merged into an odometer-shaped "120140" that beat
+        # nothing but scored 0.9958 against the true value's 0.9984.
+        plausible.sort(key=lambda s: (-s[2], -s[1]))
+        if not plausible:
+            return Reading(None, 0.0), candidates
+        value, confidence, agreement, total = plausible[0]
+        if total and agreement / total < MIN_VARIANT_AGREEMENT:
+            return Reading(None, 0.0), candidates
+        return Reading(str(value), confidence), candidates
 
 
 def tesseract_reading(img: Image.Image) -> Reading:
