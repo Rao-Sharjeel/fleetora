@@ -489,12 +489,13 @@ export async function readOdometerOnDevice(
     { extraPasses: () => [equalise(source), autoContrast(source)], withContrast: true },
   ];
 
-  // Escalation stops here even if untried passes remain. Measured in-browser
-  // on real photos: an easy dashboard finishes in ~2.1-2.6s, and letting the
-  // hard ones run to completion took up to 16s to gain one extra reading out
-  // of eight. Making every operator risk a 16-second wait for that is a bad
-  // trade at a gate, so the slow ones are handed to the operator instead.
-  const DEADLINE_MS = 8000;
+  // Escalation stops here even if untried passes remain. Measured in-browser on
+  // real photos: an easy dashboard finishes in ~2.1-2.6s, and the hard ones run
+  // up to ~16s. The budget is set above that ceiling deliberately — a rare long
+  // wait is preferred to handing the operator a keypad on a reading the
+  // pipeline would have got right. The capture screen shows progress
+  // throughout, so the wait is visible rather than a frozen screen.
+  const DEADLINE_MS = 22000;
   const startedAt = Date.now();
 
   let allCandidates: BoxCandidate[] = [];
