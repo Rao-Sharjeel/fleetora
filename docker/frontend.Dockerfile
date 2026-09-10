@@ -16,6 +16,11 @@ RUN npm ci
 
 COPY apps/ apps/
 COPY packages/ packages/
+# Each kiosk app's prebuild runs scripts/copy-ocr-model.mjs to place the
+# odometer OCR models in its public/ directory — without this the build fails
+# outright, because the models can't be imported from @gutenye/ocr-models
+# (its exports map doesn't expose assets/).
+COPY scripts/ scripts/
 
 # Vite inlines VITE_-prefixed vars from the environment at build time — no
 # .env file needed. All four kiosk/admin apps share one API origin; platform

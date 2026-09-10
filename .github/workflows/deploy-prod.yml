@@ -80,6 +80,12 @@ jobs:
           username: ${{ secrets.DO_USERNAME }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
+            # `set -e` is load-bearing: without it a failed image build was
+            # followed by `docker image prune -f`, which succeeds, and the
+            # script's exit code came from that last command. A deploy whose
+            # frontend build failed outright still reported success, and the
+            # old containers kept serving for two hours before anyone noticed.
+            set -euo pipefail
             cd /srv/fleetora-production
             git pull origin main
             docker compose -p fleetora-production -f docker-compose.prod.yml up -d --build
