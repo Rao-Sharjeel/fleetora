@@ -26,6 +26,9 @@ interface EntrySessionState {
   vehicle?: Vehicle;
   odometerPhoto?: string;
   odometerGuess: string;
+  /** False when the OCR wasn't sure — the reading screen asks the operator to
+   * check it rather than presenting a guess as if it were read cleanly. */
+  odometerConfident: boolean;
   returnCondition: ReturnCondition;
   remarks: string;
   trip?: Trip;
@@ -34,7 +37,7 @@ interface EntrySessionState {
   setGuard: (guard: Guard) => void;
   setDriver: (driver: Driver) => void;
   setVehicle: (vehicle: Vehicle) => void;
-  setOdometerCapture: (photo: string, odometerGuess: string) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean) => void;
   setOdometerGuess: (value: string) => void;
   setReturnCondition: (condition: ReturnCondition) => void;
   setRemarks: (value: string) => void;
@@ -47,6 +50,7 @@ interface EntrySessionState {
 export const useEntrySession = create<EntrySessionState>((set) => ({
   step: "SPLASH",
   odometerGuess: "",
+  odometerConfident: true,
   returnCondition: "ok",
   remarks: "",
 
@@ -54,7 +58,8 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
   setVehicle: (vehicle) => set({ vehicle }),
-  setOdometerCapture: (odometerPhoto, odometerGuess) => set({ odometerPhoto, odometerGuess }),
+  setOdometerCapture: (odometerPhoto, odometerGuess, odometerConfident) =>
+    set({ odometerPhoto, odometerGuess, odometerConfident }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
   setReturnCondition: (returnCondition) => set({ returnCondition }),
   setRemarks: (remarks) => set({ remarks }),
@@ -69,6 +74,7 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
       vehicle: undefined,
       odometerPhoto: undefined,
       odometerGuess: "",
+      odometerConfident: true,
       returnCondition: "ok",
       remarks: "",
       trip: undefined,

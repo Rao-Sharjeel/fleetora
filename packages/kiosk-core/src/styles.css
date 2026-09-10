@@ -11,6 +11,8 @@
   --color-kiosk-accent: #f5821f;
   --color-kiosk-blue: #2e7dff;
   --color-kiosk-success: #22c55e;
+  /* "check this" — distinct from danger, which means the flow is blocked. */
+  --color-kiosk-warning: #f59e0b;
   --color-kiosk-danger: #ef4444;
   --color-kiosk-text: #f5f7fb;
   --color-kiosk-muted: #8b94ad;

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { decodeQr } from "../lib/barcode";
+import { captureSharpestCrop, mapOverlayToVideoRect } from "../lib/frame-capture";
 
 interface CameraViewProps {
   onCapture: (canvas: HTMLCanvasElement, dataUrl: string) => void;
-  /** "frame" = dashed corner brackets for scanning a card/QR; "photo" = plain rounded viewfinder. */
-  variant?: "frame" | "photo";
+  /** "frame" = dashed box for scanning a card/QR; "photo" = plain rounded
+   * viewfinder; "odometer" = a letterbox band that the capture is cropped to. */
+  variant?: "frame" | "photo" | "odometer";
   hint?: string;
   /**
    * When set, polls the live video feed for a QR code instead of waiting for a
@@ -41,9 +43,11 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
 
 export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [capturing, setCapturing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,16 +108,37 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     };
   }, [onDetectQr]);
 
-  function capture() {
+  /** The region the dashed frame is drawn over, in the video's own pixels.
+   * Falls back to the whole frame when there's no frame overlay to measure. */
+  function currentCropRect() {
+    const video = videoRef.current!;
+    const overlay = overlayRef.current;
+    // No measured overlay (QR/photo variants) means capture the full frame,
+    // exactly as before — only the odometer band opts into cropping.
+    if (!overlay) return { x: 0, y: 0, width: video.videoWidth, height: video.videoHeight };
+    const videoBox = video.getBoundingClientRect();
+    const overlayBox = overlay.getBoundingClientRect();
+    return mapOverlayToVideoRect(video, {
+      left: overlayBox.left - videoBox.left,
+      top: overlayBox.top - videoBox.top,
+      width: overlayBox.width,
+      height: overlayBox.height,
+    });
+  }
+
+  async function capture() {
     const video = videoRef.current;
-    if (!video || video.videoWidth === 0) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    onCapture(canvas, canvas.toDataURL("image/jpeg", 0.85));
+    if (!video || video.videoWidth === 0 || capturing) return;
+    setCapturing(true);
+    try {
+      // The frame the operator lines up is what gets sent — previously the
+      // overlay was decorative and the whole dashboard went to the OCR.
+      const canvas = await captureSharpestCrop(video, currentCropRect);
+      if (!canvas) return;
+      onCapture(canvas, canvas.toDataURL("image/jpeg", 0.92));
+    } finally {
+      setCapturing(false);
+    }
   }
 
   if (error) {
@@ -138,6 +163,15 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         {variant === "frame" && (
           <div className="pointer-events-none absolute inset-8 rounded-xl border-2 border-dashed border-kiosk-accent/80" />
         )}
+        {variant === "odometer" && (
+          // Measured, not decorative — capture() crops to exactly this box, so
+          // what the operator lines up is what the OCR receives. Shaped like an
+          // odometer display so a tight framing is the natural thing to do.
+          <div
+            ref={overlayRef}
+            className="pointer-events-none absolute inset-x-6 top-1/2 h-24 -translate-y-1/2 rounded-xl border-2 border-dashed border-kiosk-accent/80"
+          />
+        )}
         {hint && (
           <div className="absolute inset-x-0 bottom-3 flex justify-center">
             <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white">{hint}</span>
@@ -148,7 +182,8 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         type="button"
         onClick={capture}
         aria-label="Capture"
-        className="mx-auto h-16 w-16 shrink-0 rounded-full border-4 border-kiosk-border bg-white active:scale-95"
+        disabled={capturing}
+        className="mx-auto h-16 w-16 shrink-0 rounded-full border-4 border-kiosk-border bg-white active:scale-95 disabled:opacity-60"
       />
     </div>
   );

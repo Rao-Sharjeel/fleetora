@@ -1,20 +1,37 @@
 import io
+from collections import Counter
 from dataclasses import dataclass
 
 import pytesseract
 from PIL import Image, ImageOps
 
-# pytesseract reports word-level confidence on 0-100. Below this, a reading
-# isn't trusted enough to auto-fill anything — the kiosk has no editable
-# field downstream (see CaptureOdometerQrPage), only Confirm/Retake, so a
-# shaky read must come back as "couldn't read it" rather than a guess.
-CONFIDENCE_THRESHOLD = 65
+# Tesseract's word-level confidence is not usable as a trust signal here, which
+# is worth recording because it looks like one. Measured on rendered odometer
+# crops: digits alone score 96, but the same digits read perfectly next to a
+# "km" label score 0 — the unit glyph poisons the score without affecting the
+# digits. So confidence is only used to discard outright non-text noise, and
+# the reading is trusted on the shape of what came back instead.
+MIN_WORD_CONFIDENCE = 0
+
+# An odometer is realistically 4-7 digits: below that it's a partial read of a
+# few digits, above it we've swept in a trip meter or a speedometer number too.
+MIN_DIGITS = 4
+MAX_DIGITS = 7
 
 # Guards a thin-RAM droplet against a huge decoded-image payload.
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 
-# Tesseract's accuracy drops sharply on short text under ~200px tall.
-MIN_IMAGE_HEIGHT = 200
+# Only rescue genuinely tiny crops. The previous 200px floor actively hurt:
+# measured on a rendered odometer crop, the digits read correctly at their
+# native 130px and not at all once upscaled to 200px or beyond — the
+# interpolation smears the glyph edges Tesseract keys on.
+MIN_IMAGE_HEIGHT = 64
+
+# No single page-segmentation mode is reliable here. On the same crop, PSM 8
+# and 13 read "134700" correctly while 6, 7 and 11 returned nothing; on other
+# crops the winners differ. Running several and comparing is both more accurate
+# and gives a real confidence signal, which Tesseract's own score isn't.
+PSM_MODES = (7, 8, 13, 6)
 
 
 class OdometerImageTooLarge(Exception):
@@ -50,25 +67,43 @@ def extract_odometer_reading(image_bytes: bytes) -> OdometerReading:
 
     image = ImageOps.autocontrast(image)
 
-    # PSM 7: treat the image as a single line of text — the right assumption
-    # once the kiosk sends a tight crop of just the digit display.
-    config = "--psm 7 -c tessedit_char_whitelist=0123456789"
-    data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
+    return choose_reading([_read_digits(image, psm) for psm in PSM_MODES])
 
-    digits = ""
-    confidences = []
-    for text, conf in zip(data["text"], data["conf"]):
-        text = text.strip()
-        if not text:
-            continue
-        conf = float(conf)
-        if conf < 0:  # tesseract uses -1 for non-text lines
-            continue
-        digits += "".join(ch for ch in text if ch.isdigit())
-        confidences.append(conf)
 
-    if not digits or not confidences:
+def choose_reading(candidates: list[str]) -> OdometerReading:
+    """Picks the reading several segmentation modes agree on.
+
+    Split out from the OCR itself so the voting rules can be tested without
+    depending on Tesseract or on which fonts a machine happens to have.
+    """
+    readings = [c for c in candidates if c]
+    if not readings:
         return OdometerReading(reading=None, confident=False)
 
-    avg_confidence = sum(confidences) / len(confidences)
-    return OdometerReading(reading=digits, confident=avg_confidence >= CONFIDENCE_THRESHOLD)
+    plausible = [r for r in readings if MIN_DIGITS <= len(r) <= MAX_DIGITS]
+    pool = plausible or readings
+
+    # Most common answer wins; ties break toward the mode listed first.
+    counts = Counter(pool)
+    best, agreement = counts.most_common(1)[0]
+
+    # Independent segmentation modes landing on the same digits is a far better
+    # trust signal than Tesseract's own confidence, which measurably collapses
+    # to 0 whenever a "km" label shares the crop with a perfectly-read number.
+    # The kiosk also checks the value against the vehicle's last odometer, which
+    # is stronger still but isn't known at this vehicle-agnostic endpoint.
+    confident = bool(plausible) and agreement >= 2
+    return OdometerReading(reading=best, confident=confident)
+
+
+def _read_digits(image: Image.Image, psm: int) -> str:
+    """Digit run Tesseract sees in one page-segmentation mode, or "" for none."""
+    config = f"--psm {psm} -c tessedit_char_whitelist=0123456789"
+    data = pytesseract.image_to_data(image, config=config, output_type=pytesseract.Output.DICT)
+    digits = ""
+    for text, conf in zip(data["text"], data["conf"]):
+        text = text.strip()
+        if not text or float(conf) < MIN_WORD_CONFIDENCE:  # tesseract uses -1 for non-text lines
+            continue
+        digits += "".join(ch for ch in text if ch.isdigit())
+    return digits

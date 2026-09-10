@@ -12,8 +12,10 @@ export function CaptureOdometerPage() {
     setBusy(true);
     setMessage(null);
     try {
-      const { reading } = await readOdometerReading(dataUrl);
-      setOdometerCapture(dataUrl, reading ?? "");
+      const { reading, confident } = await readOdometerReading(dataUrl);
+      // A shaky read still gets shown — the operator can correct it — but the
+      // reading screen flags it rather than presenting it as a clean read.
+      setOdometerCapture(dataUrl, reading ?? "", Boolean(reading) && confident);
       setStep("READING_EXTRACTED");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -29,13 +31,13 @@ export function CaptureOdometerPage() {
       {busy ? (
         <div className="flex flex-1 items-center justify-center text-sm text-kiosk-muted">Reading odometer…</div>
       ) : (
-        <CameraView variant="frame" hint="Fill the frame with the odometer digits" onCapture={handleCapture} />
+        <CameraView variant="odometer" hint="Line the odometer digits up inside the box" onCapture={handleCapture} />
       )}
       {import.meta.env.DEV && (
         <button
           type="button"
           onClick={() => {
-            setOdometerCapture("", "134700");
+            setOdometerCapture("", "134700", true);
             setStep("READING_EXTRACTED");
           }}
           className="text-xs text-kiosk-muted underline"

@@ -6,6 +6,7 @@ export function ReadingExtractedPage() {
   const vehicle = useFuelSession((s) => s.vehicle);
   const odometerGuess = useFuelSession((s) => s.odometerGuess);
   const setOdometerGuess = useFuelSession((s) => s.setOdometerGuess);
+  const odometerConfident = useFuelSession((s) => s.odometerConfident);
   const setStep = useFuelSession((s) => s.setStep);
 
   if (!vehicle) return null;
@@ -25,7 +26,13 @@ export function ReadingExtractedPage() {
         </>
       }
     >
-      <SuccessBadge label="Reading Extracted" />
+      {odometerConfident ? (
+        <SuccessBadge label="Reading Extracted" />
+      ) : (
+        <div className="rounded-2xl border border-kiosk-warning/40 bg-kiosk-warning/10 p-3 text-center text-sm text-kiosk-warning">
+          Couldn't read the odometer clearly — check the number below, or retake the photo.
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 rounded-2xl border border-kiosk-border bg-kiosk-panel p-4">
         <span className="text-xs text-kiosk-muted">Odometer Reading</span>
