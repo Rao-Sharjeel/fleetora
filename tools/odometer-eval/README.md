@@ -22,16 +22,24 @@ never produce:
 
 So: re-score here against real samples before changing anything about the OCR.
 
-## Current results (7 real photos)
+## Current results (8 real photos)
 
 | | correct | wrong | declined |
 |---|---|---|---|
-| detection + padding + variant agreement | **6** | **0** | 1 |
-| Tesseract on the full photo (production today) | 1 | 6 | 0 |
+| multi-pass detection + padding + variant agreement | **7** | **0** | 1 |
+| Tesseract on the full photo (production today) | 1 | 7 | 0 |
 
 The single decline is a mechanical drum caught mid-roll, where the last digit
-is genuinely ambiguous. Three fixes came from real photos and none of them
-were visible in synthetic tests:
+is genuinely ambiguous. Every fix below came from a real photo and none was
+visible in synthetic tests:
+
+- **Detect over contrast-boosted copies too.** A glare-washed truck gauge hid
+  its odometer from the detector completely — nine regions found, none covering
+  the digits — though they read fine once cropped by hand. Equalising first
+  makes the same detector find them.
+- **Merge overlapping boxes largest-first.** Merging in detection order drops a
+  wide box as a "duplicate" of a small one inside it, which cost one photo its
+  leading digits.
 
 - **Pad the detected box.** PP-OCR's boxes hug the glyphs; one that shaved the
   digits read `376785` for `316785` at 0.95 confidence — a wrong value *higher*

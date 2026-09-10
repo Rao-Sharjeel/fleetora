@@ -34,7 +34,7 @@ sys.path.insert(0, str(REPO / "backend"))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "fleetora.settings.dev")
 
 import numpy as np  # noqa: E402
-from PIL import Image, ImageEnhance  # noqa: E402
+from PIL import Image, ImageEnhance, ImageOps  # noqa: E402
 
 MODELS = REPO / "node_modules/@gutenye/ocr-models/assets"
 DET_MODEL = MODELS / "ch_PP-OCRv4_det_infer.onnx"
@@ -56,6 +56,18 @@ MIN_DIGITS, MAX_DIGITS = 4, 7
 MIN_VARIANT_AGREEMENT = 5 / 6
 
 TRUTH_RE = re.compile(r"(\d{4,7})(?=\.[A-Za-z0-9]+$)")
+
+
+def _overlaps(a, b, threshold: float = 0.5) -> bool:
+    """Rough intersection-over-smaller, to merge boxes the detection passes
+    both found rather than reading the same digits several times."""
+    ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+    ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+    if ix2 <= ix1 or iy2 <= iy1:
+        return False
+    inter = (ix2 - ix1) * (iy2 - iy1)
+    smaller = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+    return smaller > 0 and inter / smaller >= threshold
 
 
 @dataclass
@@ -167,6 +179,34 @@ class Engine:
             boxes.append((int(x1), int(y1), int(x2), int(y2), score))
         return boxes
 
+    def detect_all(self, img: Image.Image) -> list[tuple[int, int, int, int, float]]:
+        """Detection over the original and contrast-boosted copies, merged.
+
+        A glare-washed truck gauge hid its odometer from the detector entirely:
+        of nine regions found on the original, none covered the digits, even
+        though they read correctly once cropped by hand. Equalising the image
+        first makes the same detector find them. The extra passes cost inference
+        time but turn a decline into a reading.
+        """
+        grey = img.convert("L")
+        passes = [
+            img,
+            ImageOps.equalize(grey).convert("RGB"),
+            ImageOps.autocontrast(grey).convert("RGB"),
+        ]
+        found: list[tuple[int, int, int, int, float]] = []
+        for variant in passes:
+            found.extend(self.detect(variant))
+        # Largest first: a box that contains another is the better crop, and
+        # merging in detection order would instead drop it as a duplicate of
+        # the smaller one — which cost a photo its leading digits.
+        found.sort(key=lambda b: -((b[2] - b[0]) * (b[3] - b[1])))
+        merged: list[tuple[int, int, int, int, float]] = []
+        for box in found:
+            if not any(_overlaps(box, kept) for kept in merged):
+                merged.append(box)
+        return merged
+
     def crop_variants(self, img: Image.Image, box: tuple[int, int, int, int]) -> list[Image.Image]:
         """Several readings of the same box, at different padding and contrast.
 
@@ -204,7 +244,7 @@ class Engine:
 
         candidates: list[Reading] = []
         scored: list[tuple[int, float, int, int]] = []
-        for x1, y1, x2, y2, _score in self.detect(img):
+        for x1, y1, x2, y2, _score in self.detect_all(img):
             values: list[int] = []
             confidences: dict[int, float] = {}
             for variant in self.crop_variants(img, (x1, y1, x2, y2)):
