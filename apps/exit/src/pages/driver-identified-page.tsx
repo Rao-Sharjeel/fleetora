@@ -18,7 +18,7 @@ export function DriverIdentifiedPage() {
         { label: "License No", value: driver.licenceNumber },
       ]}
       capturedAt={driverCapturedAt}
-      onContinue={() => setStep("CAPTURE_FRONT")}
+      onContinue={() => setStep("SCAN_VEHICLE")}
     />
   );
 }

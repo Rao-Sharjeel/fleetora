@@ -15,7 +15,6 @@
     "@zxing/library": "^0.23.0",
     "lucide-react": "^1.33.0",
     "onnxruntime-web": "^1.29.0",
-    "tesseract.js": "^7.0.0",
     "zustand": "^5.0.15"
   },
   "peerDependencies": {

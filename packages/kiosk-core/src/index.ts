@@ -16,11 +16,9 @@ export { InstallBanner } from "./components/install-banner";
 export { useInstallPrompt } from "./hooks/use-install-prompt";
 
 export { decodeQr } from "./lib/barcode";
-export { recognizePlateText } from "./lib/ocr";
 export { readOdometerOnDevice, preloadOdometerModel } from "./lib/odometer-ocr";
 export type { OdometerReading as OnDeviceOdometerReading, DigitReading, ReadOdometerOptions } from "./lib/odometer-ocr";
 export { formatTimestamp } from "./lib/format";
-export { normalizePlate, platesMatch } from "./lib/normalize";
 export { ApiError } from "./lib/api-client";
 export {
   getVehicleByCode,

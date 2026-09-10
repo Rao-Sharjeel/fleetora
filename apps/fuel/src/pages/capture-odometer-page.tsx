@@ -72,12 +72,12 @@ export function CaptureOdometerPage() {
   return (
     <KioskShell onBack={() => setStep("SCAN_VEHICLE")}>
       <h1 className="text-lg font-semibold">Capture Odometer Reading</h1>
-      <p className="text-sm text-kiosk-muted">Fill the frame with just the odometer digits for the clearest read.</p>
+      <p className="text-sm text-kiosk-muted">Point the camera at the instrument cluster — the odometer is found automatically.</p>
       {message && <p className="rounded-lg bg-kiosk-danger/10 p-2 text-center text-sm text-kiosk-danger">{message}</p>}
       {busy ? (
         <div className="flex flex-1 items-center justify-center text-sm text-kiosk-muted">Reading odometer…</div>
       ) : (
-        <CameraView variant="odometer" hint="Line the odometer digits up inside the box" onCapture={handleCapture} />
+        <CameraView variant="odometer" hint="Get the whole cluster in frame" onCapture={handleCapture} />
       )}
       {import.meta.env.DEV && (
         <button

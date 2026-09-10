@@ -1,8 +1,7 @@
-import { ScanIdCardScreen, getVehicleByCode, createAlert, platesMatch, type Vehicle } from "@fleetora/kiosk-core";
+import { ScanIdCardScreen, getVehicleByCode, createAlert, type Vehicle } from "@fleetora/kiosk-core";
 import { useExitSession } from "@/state/exit-session";
 
 export function ScanVehiclePage() {
-  const plateGuess = useExitSession((s) => s.plateGuess);
   const setVehicle = useExitSession((s) => s.setVehicle);
   const setStep = useExitSession((s) => s.setStep);
   const reset = useExitSession((s) => s.reset);
@@ -16,10 +15,6 @@ export function ScanVehiclePage() {
       onResolved={async (vehicle) => {
         setVehicle(vehicle);
 
-        if (plateGuess.trim() && !platesMatch(plateGuess, vehicle.registrationNumber)) {
-          setStep("MISMATCH_BLOCKED");
-          return;
-        }
         if (!vehicle.allowedToExit) {
           setStep("NOT_ALLOWED_BLOCKED");
           return;
@@ -38,7 +33,7 @@ export function ScanVehiclePage() {
         setStep("CAPTURE_ODOMETER");
       }}
       onCancel={reset}
-      onBack={() => setStep("FRONT_SAVED")}
+      onBack={() => setStep("DRIVER_IDENTIFIED")}
       devSkipCode="QR-VEH-001"
     />
   );

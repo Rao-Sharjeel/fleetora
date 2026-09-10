@@ -7,12 +7,9 @@ export type ExitStep =
   | "GUARD_IDENTIFIED"
   | "SCAN_DRIVER"
   | "DRIVER_IDENTIFIED"
-  | "CAPTURE_FRONT"
-  | "FRONT_SAVED"
   | "SCAN_VEHICLE"
   | "CAPTURE_ODOMETER"
   | "READING_EXTRACTED"
-  | "MISMATCH_BLOCKED"
   | "NOT_ALLOWED_BLOCKED"
   | "DOUBLE_EXIT_BLOCKED"
   | "CONFIRM_SAVE"
@@ -25,8 +22,6 @@ interface ExitSessionState {
   driver?: Driver;
   driverCapturedAt?: string;
   vehicle?: Vehicle;
-  frontPhoto?: string;
-  plateGuess: string;
   odometerPhoto?: string;
   odometerGuess: string;
   /** False when the OCR wasn't sure — the reading screen asks the operator to
@@ -46,8 +41,6 @@ interface ExitSessionState {
   setStep: (step: ExitStep) => void;
   setGuard: (guard: Guard) => void;
   setDriver: (driver: Driver) => void;
-  setFrontCapture: (photo: string, plateGuess: string) => void;
-  setPlateGuess: (value: string) => void;
   setVehicle: (vehicle: Vehicle) => void;
   setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
   setOdometerGuess: (value: string) => void;
@@ -63,7 +56,6 @@ interface ExitSessionState {
  */
 export const useExitSession = create<ExitSessionState>((set) => ({
   step: "SPLASH",
-  plateGuess: "",
   odometerGuess: "",
   odometerConfident: true,
   odometerDigits: null,
@@ -73,8 +65,6 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   setStep: (step) => set({ step }),
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
-  setFrontCapture: (frontPhoto, plateGuess) => set({ frontPhoto, plateGuess, step: "FRONT_SAVED" }),
-  setPlateGuess: (plateGuess) => set({ plateGuess }),
   setVehicle: (vehicle) => set({ vehicle }),
   setOdometerCapture: (
     odometerPhoto,
@@ -103,9 +93,7 @@ export const useExitSession = create<ExitSessionState>((set) => ({
       driver: undefined,
       driverCapturedAt: undefined,
       vehicle: undefined,
-      frontPhoto: undefined,
-      plateGuess: "",
-      odometerPhoto: undefined,
+          odometerPhoto: undefined,
       odometerGuess: "",
       odometerConfident: true,
       odometerDigits: null,
