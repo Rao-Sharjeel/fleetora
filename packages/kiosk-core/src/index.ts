@@ -4,6 +4,7 @@ export { KioskShell, PrimaryButton, SecondaryButton } from "./components/kiosk-s
 export { CameraView } from "./components/camera-view";
 export { PersonCard } from "./components/person-card";
 export { SuccessBadge, BlockedBadge } from "./components/status-badge";
+export { OdometerDigits } from "./components/odometer-digits";
 export { ScanIdCardScreen } from "./components/scan-id-card-screen";
 export { PersonIdentifiedScreen } from "./components/person-identified-screen";
 export { SplashScreen } from "./components/splash-screen";
@@ -17,7 +18,7 @@ export { useInstallPrompt } from "./hooks/use-install-prompt";
 export { decodeQr } from "./lib/barcode";
 export { recognizePlateText } from "./lib/ocr";
 export { readOdometerOnDevice, preloadOdometerModel } from "./lib/odometer-ocr";
-export type { OnDeviceReading } from "./lib/odometer-ocr";
+export type { OdometerReading as OnDeviceOdometerReading, DigitReading, ReadOdometerOptions } from "./lib/odometer-ocr";
 export { formatTimestamp } from "./lib/format";
 export { normalizePlate, platesMatch } from "./lib/normalize";
 export { ApiError } from "./lib/api-client";

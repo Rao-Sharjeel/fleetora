@@ -1,7 +1,8 @@
 /**
- * Copies the PP-OCR recognition model into a kiosk app's public/ directory.
+ * Copies the PP-OCR detection and recognition models into a kiosk app's
+ * public/ directory.
  *
- * The model can't be imported: @gutenye/ocr-models' exports map doesn't expose
+ * They can't be imported: @gutenye/ocr-models' exports map doesn't expose
  * assets/, so a bundler can't reach it. Copying it into public/ sidesteps that
  * entirely — the app fetches it by a plain URL, and the PWA service worker
  * precaches it like any other static file. The copy is gitignored; this runs
@@ -20,29 +21,31 @@ if (!appDir) {
   process.exit(1);
 }
 
-const source = join(
-  repoRoot,
-  "node_modules/@gutenye/ocr-models/assets/ch_PP-OCRv4_rec_infer.onnx",
-);
+// Detection finds the digits anywhere on the cluster; recognition reads them.
+const MODELS = [
+  ["ch_PP-OCRv4_det_infer.onnx", "ppocr-det.onnx"],
+  ["ch_PP-OCRv4_rec_infer.onnx", "ppocr-rec.onnx"],
+];
 const targetDir = join(repoRoot, appDir, "public/ocr");
-const target = join(targetDir, "ppocr-rec.onnx");
 
 try {
-  const from = statSync(source);
-  let upToDate = false;
-  try {
-    upToDate = statSync(target).size === from.size;
-  } catch {
-    // not copied yet
-  }
-  if (upToDate) {
-    process.exit(0);
-  }
   mkdirSync(targetDir, { recursive: true });
-  copyFileSync(source, target);
-  console.log(`copied OCR model -> ${appDir}/public/ocr/ppocr-rec.onnx (${(from.size / 1048576).toFixed(1)} MB)`);
+  for (const [sourceName, targetName] of MODELS) {
+    const source = join(repoRoot, "node_modules/@gutenye/ocr-models/assets", sourceName);
+    const target = join(targetDir, targetName);
+    const from = statSync(source);
+    let upToDate = false;
+    try {
+      upToDate = statSync(target).size === from.size;
+    } catch {
+      // not copied yet
+    }
+    if (upToDate) continue;
+    copyFileSync(source, target);
+    console.log(`copied ${targetName} -> ${appDir}/public/ocr/ (${(from.size / 1048576).toFixed(1)} MB)`);
+  }
 } catch (err) {
-  console.error(`Failed to copy the OCR model: ${err.message}`);
-  console.error("Run `npm install` first — the model ships in @gutenye/ocr-models.");
+  console.error(`Failed to copy the OCR models: ${err.message}`);
+  console.error("Run `npm install` first — the models ship in @gutenye/ocr-models.");
   process.exit(1);
 }

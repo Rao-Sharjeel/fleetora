@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Guard, Driver, Vehicle, Trip } from "@fleetora/kiosk-core";
+import type { Guard, Driver, Vehicle, Trip, DigitReading } from "@fleetora/kiosk-core";
 
 export type ExitStep =
   | "SPLASH"
@@ -32,6 +32,14 @@ interface ExitSessionState {
   /** False when the OCR wasn't sure — the reading screen asks the operator to
    * check it rather than presenting a guess as if it were read cleanly. */
   odometerConfident: boolean;
+  /** Per-digit readings, so the reading screen can highlight just the position
+   * the model was unsure about instead of the whole number. Null when the
+   * value came from the server fallback, which has no per-digit detail. */
+  odometerDigits: DigitReading[] | null;
+  /** Positions (0-based) in odometerGuess that need confirming. */
+  odometerUncertain: number[];
+  /** True when a trailing digit is missing (drum mid-roll) rather than doubtful. */
+  odometerMissingDigit: boolean;
   trip?: Trip;
   error?: string;
 
@@ -41,7 +49,7 @@ interface ExitSessionState {
   setFrontCapture: (photo: string, plateGuess: string) => void;
   setPlateGuess: (value: string) => void;
   setVehicle: (vehicle: Vehicle) => void;
-  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
   setOdometerGuess: (value: string) => void;
   setTrip: (trip: Trip) => void;
   setError: (message: string | undefined) => void;
@@ -58,6 +66,9 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   plateGuess: "",
   odometerGuess: "",
   odometerConfident: true,
+  odometerDigits: null,
+  odometerUncertain: [],
+  odometerMissingDigit: false,
 
   setStep: (step) => set({ step }),
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
@@ -65,8 +76,22 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   setFrontCapture: (frontPhoto, plateGuess) => set({ frontPhoto, plateGuess, step: "FRONT_SAVED" }),
   setPlateGuess: (plateGuess) => set({ plateGuess }),
   setVehicle: (vehicle) => set({ vehicle }),
-  setOdometerCapture: (odometerPhoto, odometerGuess, odometerConfident) =>
-    set({ odometerPhoto, odometerGuess, odometerConfident }),
+  setOdometerCapture: (
+    odometerPhoto,
+    odometerGuess,
+    odometerConfident,
+    odometerDigits = null,
+    odometerUncertain = [],
+    odometerMissingDigit = false,
+  ) =>
+    set({
+      odometerPhoto,
+      odometerGuess,
+      odometerConfident,
+      odometerDigits,
+      odometerUncertain,
+      odometerMissingDigit,
+    }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
   setTrip: (trip) => set({ trip, step: "RECORD_SAVED" }),
   setError: (error) => set({ error }),
@@ -83,6 +108,9 @@ export const useExitSession = create<ExitSessionState>((set) => ({
       odometerPhoto: undefined,
       odometerGuess: "",
       odometerConfident: true,
+      odometerDigits: null,
+      odometerUncertain: [],
+      odometerMissingDigit: false,
       trip: undefined,
       error: undefined,
     }),

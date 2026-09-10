@@ -5,7 +5,7 @@ import { captureSharpestCrop, mapOverlayToVideoRect } from "../lib/frame-capture
 interface CameraViewProps {
   onCapture: (canvas: HTMLCanvasElement, dataUrl: string) => void;
   /** "frame" = dashed box for scanning a card/QR; "photo" = plain rounded
-   * viewfinder; "odometer" = a letterbox band that the capture is cropped to. */
+   * viewfinder; "odometer" = full-cluster capture for the OCR to search. */
   variant?: "frame" | "photo" | "odometer";
   hint?: string;
   /**
@@ -164,13 +164,12 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           <div className="pointer-events-none absolute inset-8 rounded-xl border-2 border-dashed border-kiosk-accent/80" />
         )}
         {variant === "odometer" && (
-          // Measured, not decorative — capture() crops to exactly this box, so
-          // what the operator lines up is what the OCR receives. Shaped like an
-          // odometer display so a tight framing is the natural thing to do.
-          <div
-            ref={overlayRef}
-            className="pointer-events-none absolute inset-x-6 top-1/2 h-24 -translate-y-1/2 rounded-xl border-2 border-dashed border-kiosk-accent/80"
-          />
+          // No crop box: the OCR detects the digits itself, wherever they sit
+          // on the cluster. A fixed band had to be aimed, and on real
+          // dashboards the odometer turned up bottom-right, mid-left and dead
+          // centre — the band missed it. This outline is guidance only, and
+          // nothing is cropped to it.
+          <div className="pointer-events-none absolute inset-4 rounded-xl border border-dashed border-kiosk-accent/40" />
         )}
         {hint && (
           <div className="absolute inset-x-0 bottom-3 flex justify-center">

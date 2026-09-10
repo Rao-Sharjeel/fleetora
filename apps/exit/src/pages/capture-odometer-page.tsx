@@ -8,9 +8,21 @@ import {
 } from "@fleetora/kiosk-core";
 import { useExitSession } from "@/state/exit-session";
 
+/** Digit runs from the vehicle's own QR label. Fleetora's stickers sit on the
+ * cluster and were picked up as a candidate on every real photo tested, so the
+ * numbers they contain are never a valid odometer reading. */
+function qrDigits(...codes: (string | undefined)[]): number[] {
+  const out: number[] = [];
+  for (const code of codes) {
+    for (const run of code?.match(/\d{3,7}/g) ?? []) out.push(Number(run));
+  }
+  return out;
+}
+
 export function CaptureOdometerPage() {
   const setOdometerCapture = useExitSession((s) => s.setOdometerCapture);
   const setStep = useExitSession((s) => s.setStep);
+  const vehicle = useExitSession((s) => s.vehicle);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -24,16 +36,32 @@ export function CaptureOdometerPage() {
     setBusy(true);
     setMessage(null);
     try {
-      // On-device first: it reads angled and glare-hit dashboards far more
-      // reliably than the server's Tesseract, and needs no round trip. The
-      // server stays as the fallback for devices where the model won't load.
-      const onDevice = await readOdometerOnDevice(canvas).catch(() => null);
-      const { reading, confident } = onDevice
-        ? { reading: onDevice.reading, confident: onDevice.confident }
-        : await readOdometerReading(dataUrl);
-      // A shaky read still gets shown — the operator can correct it — but the
-      // reading screen flags it rather than presenting it as a clean read.
-      setOdometerCapture(dataUrl, reading ?? "", Boolean(reading) && confident);
+      // On-device first: it finds and reads the digits anywhere on the
+      // cluster, and needs no round trip. The server stays as the fallback for
+      // devices where the model won't load.
+      const onDevice = await readOdometerOnDevice(canvas, {
+        // Anything below the last recorded reading isn't this odometer — it's
+        // a trip meter, a dial number, or the vehicle's own QR label, all of
+        // which showed up as candidates on real dashboards.
+        lastOdometer: vehicle?.currentOdometer,
+        excludeValues: qrDigits(vehicle?.registrationNumber, vehicle?.qrCode),
+      }).catch(() => null);
+
+      if (onDevice) {
+        setOdometerCapture(
+          dataUrl,
+          onDevice.reading,
+          onDevice.confident,
+          onDevice.digits,
+          onDevice.uncertainPositions,
+          onDevice.missingTrailingDigit,
+        );
+      } else {
+        // Server fallback has no per-digit detail, so the reading screen falls
+        // back to flagging the whole number.
+        const { reading, confident } = await readOdometerReading(dataUrl);
+        setOdometerCapture(dataUrl, reading ?? "", Boolean(reading) && confident);
+      }
       setStep("READING_EXTRACTED");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
