@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { KioskShell, CameraView, readOdometerReading } from "@fleetora/kiosk-core";
+import { useEffect, useState } from "react";
+import {
+  KioskShell,
+  CameraView,
+  readOdometerReading,
+  readOdometerOnDevice,
+  preloadOdometerModel,
+} from "@fleetora/kiosk-core";
 import { useEntrySession } from "@/state/entry-session";
 
 export function CaptureOdometerPage() {
@@ -8,11 +14,23 @@ export function CaptureOdometerPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function handleCapture(_canvas: HTMLCanvasElement, dataUrl: string) {
+  // Downloading the model on the way into the screen, rather than on the first
+  // capture, keeps the wait off the operator's critical path.
+  useEffect(() => {
+    preloadOdometerModel();
+  }, []);
+
+  async function handleCapture(canvas: HTMLCanvasElement, dataUrl: string) {
     setBusy(true);
     setMessage(null);
     try {
-      const { reading, confident } = await readOdometerReading(dataUrl);
+      // On-device first: it reads angled and glare-hit dashboards far more
+      // reliably than the server's Tesseract, and needs no round trip. The
+      // server stays as the fallback for devices where the model won't load.
+      const onDevice = await readOdometerOnDevice(canvas).catch(() => null);
+      const { reading, confident } = onDevice
+        ? { reading: onDevice.reading, confident: onDevice.confident }
+        : await readOdometerReading(dataUrl);
       // A shaky read still gets shown — the operator can correct it — but the
       // reading screen flags it rather than presenting it as a clean read.
       setOdometerCapture(dataUrl, reading ?? "", Boolean(reading) && confident);

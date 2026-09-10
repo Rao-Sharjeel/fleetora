@@ -60,6 +60,7 @@ const EMPTY_DETAILS: FuelDetails = {
 export const useFuelSession = create<FuelSessionState>((set) => ({
   step: "SPLASH",
   odometerGuess: "",
+  odometerConfident: true,
   details: { ...EMPTY_DETAILS },
 
   setStep: (step) => set({ step }),
