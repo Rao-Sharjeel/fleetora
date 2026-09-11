@@ -9,6 +9,7 @@ export type ExitStep =
   | "DRIVER_IDENTIFIED"
   | "SCAN_VEHICLE"
   | "CAPTURE_ODOMETER"
+  | "REPORT_ODOMETER"
   | "READING_EXTRACTED"
   | "NOT_ALLOWED_BLOCKED"
   | "DOUBLE_EXIT_BLOCKED"
@@ -35,6 +36,11 @@ interface ExitSessionState {
   odometerUncertain: number[];
   /** True when a trailing digit is missing (drum mid-roll) rather than doubtful. */
   odometerMissingDigit: boolean;
+  /** Reads attempted on this vehicle. After ODOMETER_ATTEMPT_LIMIT the guard
+   * is offered the "can't read it" route rather than retrying forever. */
+  odometerAttempts: number;
+  /** Photo of an unreadable odometer, sent in place of a reading. */
+  odometerIssuePhoto?: string;
   trip?: Trip;
   error?: string;
 
@@ -44,6 +50,8 @@ interface ExitSessionState {
   setVehicle: (vehicle: Vehicle) => void;
   setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
   setOdometerGuess: (value: string) => void;
+  countOdometerAttempt: () => void;
+  setOdometerIssuePhoto: (photo: string) => void;
   setTrip: (trip: Trip) => void;
   setError: (message: string | undefined) => void;
   reset: () => void;
@@ -61,6 +69,7 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   odometerDigits: null,
   odometerUncertain: [],
   odometerMissingDigit: false,
+  odometerAttempts: 0,
 
   setStep: (step) => set({ step }),
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
@@ -83,6 +92,8 @@ export const useExitSession = create<ExitSessionState>((set) => ({
       odometerMissingDigit,
     }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
+  countOdometerAttempt: () => set((s) => ({ odometerAttempts: s.odometerAttempts + 1 })),
+  setOdometerIssuePhoto: (odometerIssuePhoto) => set({ odometerIssuePhoto }),
   setTrip: (trip) => set({ trip, step: "RECORD_SAVED" }),
   setError: (error) => set({ error }),
   reset: () =>
@@ -99,6 +110,8 @@ export const useExitSession = create<ExitSessionState>((set) => ({
       odometerDigits: null,
       odometerUncertain: [],
       odometerMissingDigit: false,
+      odometerAttempts: 0,
+      odometerIssuePhoto: undefined,
       trip: undefined,
       error: undefined,
     }),

@@ -10,6 +10,7 @@ export type FuelStep =
   | "DRIVER_IDENTIFIED"
   | "SCAN_VEHICLE"
   | "CAPTURE_ODOMETER"
+  | "REPORT_ODOMETER"
   | "READING_EXTRACTED"
   | "FUEL_DETAILS"
   | "CONFIRM_SAVE"
@@ -43,6 +44,11 @@ interface FuelSessionState {
   odometerUncertain: number[];
   /** True when a trailing digit is missing (drum mid-roll) rather than doubtful. */
   odometerMissingDigit: boolean;
+  /** Reads attempted on this vehicle. After ODOMETER_ATTEMPT_LIMIT the guard
+   * is offered the "can't read it" route rather than retrying forever. */
+  odometerAttempts: number;
+  /** Photo of an unreadable odometer, sent in place of a reading. */
+  odometerIssuePhoto?: string;
   details: FuelDetails;
   entry?: FuelEntry;
 
@@ -52,6 +58,8 @@ interface FuelSessionState {
   setVehicle: (vehicle: Vehicle) => void;
   setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
   setOdometerGuess: (value: string) => void;
+  countOdometerAttempt: () => void;
+  setOdometerIssuePhoto: (photo: string) => void;
   setDetails: (patch: Partial<FuelDetails>) => void;
   setEntry: (entry: FuelEntry) => void;
   reset: () => void;
@@ -73,6 +81,7 @@ export const useFuelSession = create<FuelSessionState>((set) => ({
   odometerDigits: null,
   odometerUncertain: [],
   odometerMissingDigit: false,
+  odometerAttempts: 0,
   details: { ...EMPTY_DETAILS },
 
   setStep: (step) => set({ step }),
@@ -96,6 +105,8 @@ export const useFuelSession = create<FuelSessionState>((set) => ({
       odometerMissingDigit,
     }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
+  countOdometerAttempt: () => set((s) => ({ odometerAttempts: s.odometerAttempts + 1 })),
+  setOdometerIssuePhoto: (odometerIssuePhoto) => set({ odometerIssuePhoto }),
   setDetails: (patch) => set((state) => ({ details: { ...state.details, ...patch } })),
   setEntry: (entry) => set({ entry, step: "RECORD_SAVED" }),
   reset: () =>
@@ -112,6 +123,8 @@ export const useFuelSession = create<FuelSessionState>((set) => ({
       odometerDigits: null,
       odometerUncertain: [],
       odometerMissingDigit: false,
+      odometerAttempts: 0,
+      odometerIssuePhoto: undefined,
       details: { ...EMPTY_DETAILS },
       entry: undefined,
     }),

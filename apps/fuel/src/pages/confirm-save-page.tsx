@@ -7,6 +7,8 @@ export function ConfirmSavePage() {
   const driver = useFuelSession((s) => s.driver);
   const vehicle = useFuelSession((s) => s.vehicle);
   const odometerGuess = useFuelSession((s) => s.odometerGuess);
+  const odometerIssuePhoto = useFuelSession((s) => s.odometerIssuePhoto);
+  const odometerAttempts = useFuelSession((s) => s.odometerAttempts);
   const details = useFuelSession((s) => s.details);
   const setEntry = useFuelSession((s) => s.setEntry);
   const reset = useFuelSession((s) => s.reset);
@@ -25,7 +27,11 @@ export function ConfirmSavePage() {
       const entry = await createFuelEntry({
         vehicleId: vehicle.id,
         driverId: driver.id,
-        odometer: Number(odometerGuess),
+        // Either a reading or a photo goes up, never both: an unreadable
+        // odometer is recorded as absent and resolved by an admin.
+        ...(odometerIssuePhoto
+          ? { odometerIssuePhoto, odometerIssueAttempts: odometerAttempts }
+          : { odometer: Number(odometerGuess) }),
         fuelType: "petrol",
         litres: Number(details.litres),
         ratePerLitre: Number(details.ratePerLitre),
@@ -61,7 +67,10 @@ export function ConfirmSavePage() {
         <Row label="Guard" value={`${guard.name} (${guard.guardId})`} />
         <Row label="Driver" value={`${driver.name} (${driver.employeeId})`} />
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
-        <Row label="Odometer" value={`${Number(odometerGuess).toLocaleString()} km`} />
+        <Row
+          label="Odometer"
+          value={odometerIssuePhoto ? "Reported — an admin will enter it" : `${Number(odometerGuess).toLocaleString()} km`}
+        />
         <Row label="Litres" value={details.litres} />
         <Row label="Rate/Litre" value={details.ratePerLitre} />
         <Row label="Total" value={total.toLocaleString()} />

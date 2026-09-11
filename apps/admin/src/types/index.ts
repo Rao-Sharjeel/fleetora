@@ -63,6 +63,27 @@ export interface Vehicle {
   allowedToExitUpdatedAt?: string;
 }
 
+/** An odometer a guard could not get read, awaiting an admin's reading.
+ * Guards deliberately cannot type readings in themselves. */
+export interface OdometerIssue {
+  id: string;
+  vehicleId: string;
+  registrationNumber: string;
+  tripNumber?: string | null;
+  stage: "gate_out" | "gate_in" | "fuel";
+  photoUrl?: string | null;
+  /** Reads attempted at the gate before the guard gave up. */
+  attempts: number;
+  raisedByName?: string | null;
+  raisedAt: string;
+  status: "pending" | "resolved";
+  reading?: number | null;
+  resolvedByName?: string | null;
+  resolvedAt?: string | null;
+  /** The vehicle's odometer as it stands — the floor for any correction. */
+  lastKnownOdometer: number;
+}
+
 export type LicenceStatus = "valid" | "expiring_soon" | "expired";
 
 export interface Driver {
@@ -112,7 +133,8 @@ export interface Trip {
   approvedBy?: string;
   outTime: string;
   inTime?: string;
-  odometerOut: number;
+  /** Absent while a guard-reported unreadable odometer awaits an admin. */
+  odometerOut?: number;
   odometerIn?: number;
   tripKm?: number;
   status: TripStatus;
@@ -128,7 +150,8 @@ export interface FuelEntry {
   vehicleId: string;
   driverId: string;
   dateTime: string;
-  odometer: number;
+  /** Absent while a reported unreadable odometer awaits an admin. */
+  odometer?: number;
   fuelType: "petrol" | "diesel" | "other";
   litres: number;
   ratePerLitre: number;

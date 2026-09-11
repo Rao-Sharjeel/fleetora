@@ -350,6 +350,8 @@ class OdometerIssueViewSet(viewsets.ReadOnlyModelViewSet):
                 if trip.odometer_out is not None and trip.odometer_in is not None:
                     trip.trip_km = trip.odometer_in - trip.odometer_out
                 trip.save(update_fields=["odometer_out", "odometer_in", "trip_km"])
+            elif issue.fuel_entry_id:
+                FuelEntry.objects.filter(pk=issue.fuel_entry_id).update(odometer=reading)
 
             # The vehicle's odometer was left at its last known-good value while
             # this was pending, so it only moves forward now — and only if this

@@ -14,3 +14,8 @@ export function configureKiosk(next: KioskConfig): void {
 export function getKioskConfig(): KioskConfig {
   return config;
 }
+
+/** Reads a guard may attempt before being offered the "can't read it" route.
+ * Three is enough to rule out a bad angle or a smudge without turning the gate
+ * into a queue of people re-photographing the same cluster. */
+export const ODOMETER_ATTEMPT_LIMIT = 3;

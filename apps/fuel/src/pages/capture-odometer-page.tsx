@@ -6,6 +6,7 @@ import {
   readOdometerReading,
   readOdometerOnDevice,
   preloadOdometerModel,
+  ODOMETER_ATTEMPT_LIMIT,
 } from "@fleetora/kiosk-core";
 import { useFuelSession } from "@/state/fuel-session";
 
@@ -23,6 +24,8 @@ function qrDigits(...codes: (string | undefined)[]): number[] {
 export function CaptureOdometerPage() {
   const setOdometerCapture = useFuelSession((s) => s.setOdometerCapture);
   const setStep = useFuelSession((s) => s.setStep);
+  const odometerAttempts = useFuelSession((s) => s.odometerAttempts);
+  const countOdometerAttempt = useFuelSession((s) => s.countOdometerAttempt);
   const vehicle = useFuelSession((s) => s.vehicle);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -36,6 +39,7 @@ export function CaptureOdometerPage() {
   async function handleCapture(canvas: HTMLCanvasElement, dataUrl: string) {
     setBusy(true);
     setMessage(null);
+    countOdometerAttempt();
     // The OCR runs on the main thread, so without giving the browser a frame
     // first the "Reading odometer…" state never gets painted — the camera
     // appeared to stay open for the whole read.
@@ -86,6 +90,15 @@ export function CaptureOdometerPage() {
         </div>
       ) : (
         <CameraView variant="odometer" hint="Get the whole cluster in frame" onCapture={handleCapture} />
+      )}
+      {!busy && odometerAttempts >= ODOMETER_ATTEMPT_LIMIT && (
+        <button
+          type="button"
+          onClick={() => setStep("REPORT_ODOMETER")}
+          className="rounded-xl border border-kiosk-warning/50 bg-kiosk-warning/10 px-4 py-3 text-sm font-medium text-kiosk-warning"
+        >
+          Can't read this odometer? Report it
+        </button>
       )}
       {import.meta.env.DEV && (
         <button

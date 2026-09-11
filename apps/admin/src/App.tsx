@@ -30,6 +30,7 @@ import { DriverPortalPage } from "@/features/auth/driver-portal-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { useSession } from "@/hooks/use-session";
 import { defaultRouteForRole } from "@/routes/nav-config";
+import { OdometerIssuesPage } from "@/features/odometer-issues/pages/odometer-issues-page";
 
 function HomeRedirect() {
   const role = useSession((s) => s.role);
@@ -181,6 +182,14 @@ export default function App() {
           element={
             <RoleGuard allow={["admin"]}>
               <MasterSetupPage />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="/odometer-issues"
+          element={
+            <RoleGuard allow={["admin", "fleet_manager"]}>
+              <OdometerIssuesPage />
             </RoleGuard>
           }
         />

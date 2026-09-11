@@ -303,7 +303,9 @@ class FuelEntry(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.PROTECT, related_name="fuel_entries")
     driver = models.ForeignKey(Driver, on_delete=models.PROTECT, related_name="fuel_entries")
     date_time = models.DateTimeField(default=timezone.now)
-    odometer = models.PositiveIntegerField()
+    # Nullable for the same reason as Trip.odometer_out: an attendant who can't
+    # get a reading raises an issue instead, and it stays empty until resolved.
+    odometer = models.PositiveIntegerField(null=True, blank=True)
     fuel_type = models.CharField(max_length=10, choices=Vehicle.FuelType.choices)
     litres = models.DecimalField(max_digits=8, decimal_places=2)
     rate_per_litre = models.DecimalField(max_digits=8, decimal_places=2)

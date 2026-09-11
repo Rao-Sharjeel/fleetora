@@ -13,6 +13,8 @@ export function ConfirmSavePage() {
   const driver = useEntrySession((s) => s.driver);
   const vehicle = useEntrySession((s) => s.vehicle);
   const odometerGuess = useEntrySession((s) => s.odometerGuess);
+  const odometerIssuePhoto = useEntrySession((s) => s.odometerIssuePhoto);
+  const odometerAttempts = useEntrySession((s) => s.odometerAttempts);
   const returnCondition = useEntrySession((s) => s.returnCondition);
   const remarks = useEntrySession((s) => s.remarks);
   const setTrip = useEntrySession((s) => s.setTrip);
@@ -29,7 +31,11 @@ export function ConfirmSavePage() {
     try {
       const trip = await completeGateIn({
         vehicleId: vehicle.id,
-        odometerIn: Number(odometerGuess),
+        // Either a reading or a photo goes up, never both: an unreadable
+        // odometer is recorded as absent and resolved by an admin.
+        ...(odometerIssuePhoto
+          ? { odometerIssuePhoto, odometerIssueAttempts: odometerAttempts }
+          : { odometerIn: Number(odometerGuess) }),
         returnCondition,
         remarks,
       });
@@ -61,7 +67,10 @@ export function ConfirmSavePage() {
         <Row label="Guard" value={`${guard.name} (${guard.guardId})`} />
         <Row label="Driver" value={`${driver.name} (${driver.employeeId})`} />
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
-        <Row label="Closing Odometer" value={`${Number(odometerGuess).toLocaleString()} km`} />
+        <Row
+          label="Closing Odometer"
+          value={odometerIssuePhoto ? "Reported — an admin will enter it" : `${Number(odometerGuess).toLocaleString()} km`}
+        />
         <Row label="Condition" value={CONDITION_LABELS[returnCondition]} />
         <Row label="Date & Time" value={new Date().toLocaleString()} />
         <Row label="Location" value="Main Gate - Entry" />

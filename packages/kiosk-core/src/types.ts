@@ -45,7 +45,11 @@ export interface GateOutPayload {
   vehicleId: string;
   driverId: string;
   guardId?: string;
-  odometerOut: number;
+  /** Omitted when the guard could not get a reading — send
+   * `odometerIssuePhoto` instead and an admin resolves it later. */
+  odometerOut?: number;
+  odometerIssuePhoto?: string;
+  odometerIssueAttempts?: number;
   purpose: string;
   destination: string;
   requestedBy: string;
@@ -59,7 +63,7 @@ export interface Trip {
   tripNumber: string;
   vehicleId: string;
   driverId: string;
-  odometerOut: number;
+  odometerOut?: number;
   odometerIn?: number;
   tripKm?: number;
   outTime: string;
@@ -70,7 +74,9 @@ export type ReturnCondition = "ok" | "maintenance_required" | "damage_incident";
 
 export interface GateInPayload {
   vehicleId: string;
-  odometerIn: number;
+  odometerIn?: number;
+  odometerIssuePhoto?: string;
+  odometerIssueAttempts?: number;
   returnCondition: ReturnCondition;
   remarks?: string;
 }

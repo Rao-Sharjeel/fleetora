@@ -8,6 +8,8 @@ export function ConfirmSavePage() {
   const driver = useExitSession((s) => s.driver);
   const vehicle = useExitSession((s) => s.vehicle);
   const odometerGuess = useExitSession((s) => s.odometerGuess);
+  const odometerIssuePhoto = useExitSession((s) => s.odometerIssuePhoto);
+  const odometerAttempts = useExitSession((s) => s.odometerAttempts);
   const setTrip = useExitSession((s) => s.setTrip);
   const reset = useExitSession((s) => s.reset);
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,11 @@ export function ConfirmSavePage() {
         vehicleId: vehicle.id,
         driverId: driver.id,
         guardId: guard.id,
-        odometerOut: Number(odometerGuess),
+        // Either a reading or a photo goes up, never both: an unreadable
+        // odometer is recorded as absent and resolved by an admin.
+        ...(odometerIssuePhoto
+          ? { odometerIssuePhoto, odometerIssueAttempts: odometerAttempts }
+          : { odometerOut: Number(odometerGuess) }),
         // The reference design doesn't collect a trip purpose/destination at the kiosk —
         // these placeholders keep the shared createGateOut contract satisfied.
         purpose: "Not Specified",
@@ -60,7 +66,10 @@ export function ConfirmSavePage() {
         <Row label="Guard" value={`${guard.name} (${guard.guardId})`} />
         <Row label="Driver" value={`${driver.name} (${driver.employeeId})`} />
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
-        <Row label="Odometer Reading" value={`${Number(odometerGuess).toLocaleString()} km`} />
+        <Row
+          label="Odometer Reading"
+          value={odometerIssuePhoto ? "Reported — an admin will enter it" : `${Number(odometerGuess).toLocaleString()} km`}
+        />
         <Row label="Date & Time" value={new Date().toLocaleString()} />
         <Row label="Location" value="Main Gate - Exit" />
       </div>

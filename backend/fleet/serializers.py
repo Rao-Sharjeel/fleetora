@@ -398,6 +398,9 @@ class GateInSerializer(serializers.Serializer):
 
 
 class FuelEntrySerializer(serializers.ModelSerializer):
+    odometer_issue_photo = Base64ImageField(required=False, allow_null=True, write_only=True)
+    odometer_issue_attempts = serializers.IntegerField(min_value=0, required=False, default=0, write_only=True)
+
     vehicle_id = SafePrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
     driver_id = SafePrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
 
@@ -417,9 +420,34 @@ class FuelEntrySerializer(serializers.ModelSerializer):
             "payment_method",
             "receipt_no",
             "full_tank",
+            "odometer_issue_photo",
+            "odometer_issue_attempts",
         ]
         # total is derived server-side from litres x rate, never accepted from a client.
         read_only_fields = ["id", "total"]
+
+    def validate(self, attrs):
+        if attrs.get("odometer") is None and not attrs.get("odometer_issue_photo"):
+            raise serializers.ValidationError(
+                {"odometer": "Provide a reading, or a photo of the odometer to be resolved later."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        photo = validated_data.pop("odometer_issue_photo", None)
+        attempts = validated_data.pop("odometer_issue_attempts", 0)
+        entry = super().create(validated_data)
+        if photo is not None:
+            # Same contract as the gate flows: the reading stays empty and an
+            # admin fills it in from the photo.
+            OdometerIssue.objects.create(
+                vehicle=entry.vehicle,
+                fuel_entry=entry,
+                stage=OdometerIssue.Stage.FUEL,
+                photo=photo,
+                attempts=attempts,
+            )
+        return entry
 
 
 class OdometerIssueSerializer(serializers.ModelSerializer):

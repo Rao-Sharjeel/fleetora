@@ -9,6 +9,7 @@ export type EntryStep =
   | "DRIVER_IDENTIFIED"
   | "SCAN_VEHICLE"
   | "CAPTURE_ODOMETER"
+  | "REPORT_ODOMETER"
   | "READING_EXTRACTED"
   | "NO_OPEN_TRIP_BLOCKED"
   | "RETURN_CONDITION"
@@ -37,6 +38,11 @@ interface EntrySessionState {
   odometerUncertain: number[];
   /** True when a trailing digit is missing (drum mid-roll) rather than doubtful. */
   odometerMissingDigit: boolean;
+  /** Reads attempted on this vehicle. After ODOMETER_ATTEMPT_LIMIT the guard
+   * is offered the "can't read it" route rather than retrying forever. */
+  odometerAttempts: number;
+  /** Photo of an unreadable odometer, sent in place of a reading. */
+  odometerIssuePhoto?: string;
   returnCondition: ReturnCondition;
   remarks: string;
   trip?: Trip;
@@ -47,6 +53,8 @@ interface EntrySessionState {
   setVehicle: (vehicle: Vehicle) => void;
   setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
   setOdometerGuess: (value: string) => void;
+  countOdometerAttempt: () => void;
+  setOdometerIssuePhoto: (photo: string) => void;
   setReturnCondition: (condition: ReturnCondition) => void;
   setRemarks: (value: string) => void;
   setTrip: (trip: Trip) => void;
@@ -62,6 +70,7 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
   odometerDigits: null,
   odometerUncertain: [],
   odometerMissingDigit: false,
+  odometerAttempts: 0,
   returnCondition: "ok",
   remarks: "",
 
@@ -86,6 +95,8 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
       odometerMissingDigit,
     }),
   setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
+  countOdometerAttempt: () => set((s) => ({ odometerAttempts: s.odometerAttempts + 1 })),
+  setOdometerIssuePhoto: (odometerIssuePhoto) => set({ odometerIssuePhoto }),
   setReturnCondition: (returnCondition) => set({ returnCondition }),
   setRemarks: (remarks) => set({ remarks }),
   setTrip: (trip) => set({ trip, step: "RECORD_SAVED" }),
@@ -103,6 +114,8 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
       odometerDigits: null,
       odometerUncertain: [],
       odometerMissingDigit: false,
+      odometerAttempts: 0,
+      odometerIssuePhoto: undefined,
       returnCondition: "ok",
       remarks: "",
       trip: undefined,

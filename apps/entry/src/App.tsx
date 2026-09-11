@@ -7,6 +7,7 @@ import { ScanDriverPage } from "@/pages/scan-driver-page";
 import { DriverIdentifiedPage } from "@/pages/driver-identified-page";
 import { ScanVehiclePage } from "@/pages/scan-vehicle-page";
 import { CaptureOdometerPage } from "@/pages/capture-odometer-page";
+import { ReportOdometerPage } from "@/pages/report-odometer-page";
 import { ReadingExtractedPage } from "@/pages/reading-extracted-page";
 import { NoOpenTripBlockedPage } from "@/pages/no-open-trip-blocked-page";
 import { ReturnConditionPage } from "@/pages/return-condition-page";
@@ -21,6 +22,7 @@ const STEP_PAGES: Record<EntryStep, () => ReactElement | null> = {
   DRIVER_IDENTIFIED: DriverIdentifiedPage,
   SCAN_VEHICLE: ScanVehiclePage,
   CAPTURE_ODOMETER: CaptureOdometerPage,
+  REPORT_ODOMETER: ReportOdometerPage,
   READING_EXTRACTED: ReadingExtractedPage,
   NO_OPEN_TRIP_BLOCKED: NoOpenTripBlockedPage,
   RETURN_CONDITION: ReturnConditionPage,
