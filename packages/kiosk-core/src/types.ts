@@ -63,8 +63,10 @@ export interface Trip {
   tripNumber: string;
   vehicleId: string;
   driverId: string;
-  odometerOut?: number;
-  odometerIn?: number;
+  /** null while a guard-reported unreadable odometer awaits an admin.
+   * Django sends JSON null here, never an absent key. */
+  odometerOut?: number | null;
+  odometerIn?: number | null;
   tripKm?: number;
   outTime: string;
   inTime?: string;

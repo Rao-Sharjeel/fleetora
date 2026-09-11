@@ -9,14 +9,27 @@ export function RecordSavedPage() {
 
   if (!vehicle || !driver || !trip) return null;
 
+  // The reading was reported rather than scanned, so say so plainly — the
+  // guard should leave knowing the number is still outstanding and who has it.
+  const readingReported = trip.odometerIn == null;
+
   return (
     <KioskShell footer={<PrimaryButton onClick={reset}>Done</PrimaryButton>}>
-      <SuccessBadge label="Entry Record Saved Successfully!" />
-      <p className="text-center text-sm text-kiosk-muted">Thank you.</p>
+      <SuccessBadge
+        label={readingReported ? "Entry Saved — Reading Reported" : "Entry Record Saved Successfully!"}
+      />
+      <p className="text-center text-sm text-kiosk-muted">
+        {readingReported
+          ? "The odometer photo has been sent to an administrator, who will enter the reading."
+          : "Thank you."}
+      </p>
       <div className="flex flex-col divide-y divide-kiosk-border rounded-2xl border border-kiosk-border bg-kiosk-panel">
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
-        <Row label="Closing Odometer" value={`${(trip.odometerIn ?? 0).toLocaleString()} km`} />
-        <Row label="Trip KM" value={`${(trip.tripKm ?? 0).toLocaleString()} km`} />
+        <Row
+          label="Closing Odometer"
+          value={trip.odometerIn == null ? "Reported — an admin will enter it" : `${trip.odometerIn.toLocaleString()} km`}
+        />
+        <Row label="Trip KM" value={trip.tripKm == null ? "—" : `${trip.tripKm.toLocaleString()} km`} />
         <Row label="Driver" value={driver.name} />
         <Row label="Time" value={trip.inTime ? formatTimestamp(trip.inTime) : "—"} />
       </div>

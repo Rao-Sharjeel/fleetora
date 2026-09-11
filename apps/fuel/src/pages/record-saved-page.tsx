@@ -9,10 +9,18 @@ export function RecordSavedPage() {
 
   if (!vehicle || !driver || !entry) return null;
 
+  const readingReported = entry.odometer == null;
+
   return (
     <KioskShell footer={<PrimaryButton onClick={reset}>Done</PrimaryButton>}>
-      <SuccessBadge label="Fuel Entry Saved Successfully!" />
-      <p className="text-center text-sm text-kiosk-muted">Thank you.</p>
+      <SuccessBadge
+        label={readingReported ? "Fuel Entry Saved — Reading Reported" : "Fuel Entry Saved Successfully!"}
+      />
+      <p className="text-center text-sm text-kiosk-muted">
+        {readingReported
+          ? "The odometer photo has been sent to an administrator, who will enter the reading."
+          : "Thank you."}
+      </p>
       <div className="flex flex-col divide-y divide-kiosk-border rounded-2xl border border-kiosk-border bg-kiosk-panel">
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
         <Row label="Litres" value={`${entry.litres}`} />

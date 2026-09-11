@@ -71,7 +71,7 @@ export function GateInPage() {
 
   if (completed && trip) {
     // Unknown while the opening reading is still awaiting an admin.
-    const km = trip.odometerOut === undefined ? undefined : Number(odometerIn) - trip.odometerOut;
+    const km = trip.odometerOut == null ? undefined : Number(odometerIn) - trip.odometerOut;
     return (
       <Card className="mx-auto max-w-md">
         <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
@@ -127,7 +127,7 @@ export function GateInPage() {
                   value={odometerIn}
                   onChange={(e) => setOdometerIn(e.target.value)}
                 />
-                {odometerIn && trip.odometerOut !== undefined && Number(odometerIn) >= trip.odometerOut && (
+                {odometerIn && trip.odometerOut != null && Number(odometerIn) >= trip.odometerOut && (
                   <span className="text-xs text-muted-foreground">
                     Trip KM: {formatKm(Number(odometerIn) - trip.odometerOut)}
                   </span>

@@ -133,8 +133,9 @@ export interface Trip {
   approvedBy?: string;
   outTime: string;
   inTime?: string;
-  /** Absent while a guard-reported unreadable odometer awaits an admin. */
-  odometerOut?: number;
+  /** null while a guard-reported unreadable odometer awaits an admin.
+   * Django sends JSON null here, never an absent key. */
+  odometerOut?: number | null;
   odometerIn?: number;
   tripKm?: number;
   status: TripStatus;
@@ -150,8 +151,8 @@ export interface FuelEntry {
   vehicleId: string;
   driverId: string;
   dateTime: string;
-  /** Absent while a reported unreadable odometer awaits an admin. */
-  odometer?: number;
+  /** null while a reported unreadable odometer awaits an admin. */
+  odometer?: number | null;
   fuelType: "petrol" | "diesel" | "other";
   litres: number;
   ratePerLitre: number;
