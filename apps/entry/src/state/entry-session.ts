@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Guard, Driver, Vehicle, Trip, DigitReading } from "@fleetora/kiosk-core";
+import type { Guard, Driver, Vehicle, Trip } from "@fleetora/kiosk-core";
 
 export type EntryStep =
   | "SPLASH"
@@ -30,14 +30,6 @@ interface EntrySessionState {
   /** False when the OCR wasn't sure — the reading screen asks the operator to
    * check it rather than presenting a guess as if it were read cleanly. */
   odometerConfident: boolean;
-  /** Per-digit readings, so the reading screen can highlight just the position
-   * the model was unsure about instead of the whole number. Null when the
-   * value came from the server fallback, which has no per-digit detail. */
-  odometerDigits: DigitReading[] | null;
-  /** Positions (0-based) in odometerGuess that need confirming. */
-  odometerUncertain: number[];
-  /** True when a trailing digit is missing (drum mid-roll) rather than doubtful. */
-  odometerMissingDigit: boolean;
   /** Reads attempted on this vehicle. After ODOMETER_ATTEMPT_LIMIT the guard
    * is offered the "can't read it" route rather than retrying forever. */
   odometerAttempts: number;
@@ -51,8 +43,7 @@ interface EntrySessionState {
   setGuard: (guard: Guard) => void;
   setDriver: (driver: Driver) => void;
   setVehicle: (vehicle: Vehicle) => void;
-  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, digits?: DigitReading[] | null, uncertain?: number[], missingDigit?: boolean) => void;
-  setOdometerGuess: (value: string) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean) => void;
   countOdometerAttempt: () => void;
   setOdometerIssuePhoto: (photo: string) => void;
   setReturnCondition: (condition: ReturnCondition) => void;
@@ -67,9 +58,6 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
   step: "SPLASH",
   odometerGuess: "",
   odometerConfident: true,
-  odometerDigits: null,
-  odometerUncertain: [],
-  odometerMissingDigit: false,
   odometerAttempts: 0,
   returnCondition: "ok",
   remarks: "",
@@ -78,23 +66,8 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
   setGuard: (guard) => set({ guard, guardCapturedAt: new Date().toISOString(), step: "GUARD_IDENTIFIED" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
   setVehicle: (vehicle) => set({ vehicle }),
-  setOdometerCapture: (
-    odometerPhoto,
-    odometerGuess,
-    odometerConfident,
-    odometerDigits = null,
-    odometerUncertain = [],
-    odometerMissingDigit = false,
-  ) =>
-    set({
-      odometerPhoto,
-      odometerGuess,
-      odometerConfident,
-      odometerDigits,
-      odometerUncertain,
-      odometerMissingDigit,
-    }),
-  setOdometerGuess: (odometerGuess) => set({ odometerGuess }),
+  setOdometerCapture: (odometerPhoto, odometerGuess, odometerConfident) =>
+    set({ odometerPhoto, odometerGuess, odometerConfident }),
   countOdometerAttempt: () => set((s) => ({ odometerAttempts: s.odometerAttempts + 1 })),
   setOdometerIssuePhoto: (odometerIssuePhoto) => set({ odometerIssuePhoto }),
   setReturnCondition: (returnCondition) => set({ returnCondition }),
@@ -111,9 +84,6 @@ export const useEntrySession = create<EntrySessionState>((set) => ({
       odometerPhoto: undefined,
       odometerGuess: "",
       odometerConfident: true,
-      odometerDigits: null,
-      odometerUncertain: [],
-      odometerMissingDigit: false,
       odometerAttempts: 0,
       odometerIssuePhoto: undefined,
       returnCondition: "ok",

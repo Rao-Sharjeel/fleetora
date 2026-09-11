@@ -56,21 +56,20 @@ export function CaptureOdometerPage() {
         excludeValues: qrDigits(vehicle?.registrationNumber, vehicle?.qrCode),
       }).catch(() => null);
 
-      if (onDevice) {
-        setOdometerCapture(
-          dataUrl,
-          onDevice.reading,
-          onDevice.confident,
-          onDevice.digits,
-          onDevice.uncertainPositions,
-          onDevice.missingTrailingDigit,
-        );
-      } else {
-        // Server fallback has no per-digit detail, so the reading screen falls
-        // back to flagging the whole number.
-        const { reading, confident } = await readOdometerReading(dataUrl);
-        setOdometerCapture(dataUrl, reading ?? "", Boolean(reading) && confident);
+      const result = onDevice ?? (await readOdometerReading(dataUrl));
+      const reading = result.reading ?? "";
+      const confident = Boolean(reading) && result.confident;
+
+      if (!confident) {
+        // Nobody here can correct a reading, so an unsure one is not offered
+        // for approval — that would just be a guard rubber-stamping a number
+        // the reader itself doubts. It counts as a failed attempt instead.
+        setMessage("Couldn't read the odometer clearly. Try again from a different angle.");
+        setBusy(false);
+        return;
       }
+
+      setOdometerCapture(dataUrl, reading, true);
       setStep("READING_EXTRACTED");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");

@@ -4,7 +4,6 @@ export { KioskShell, PrimaryButton, SecondaryButton } from "./components/kiosk-s
 export { CameraView } from "./components/camera-view";
 export { PersonCard } from "./components/person-card";
 export { SuccessBadge, BlockedBadge } from "./components/status-badge";
-export { OdometerDigits } from "./components/odometer-digits";
 export { ReportOdometerScreen } from "./components/report-odometer-screen";
 export { ScanIdCardScreen } from "./components/scan-id-card-screen";
 export { PersonIdentifiedScreen } from "./components/person-identified-screen";
