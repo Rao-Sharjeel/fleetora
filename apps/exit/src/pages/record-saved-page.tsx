@@ -17,7 +17,14 @@ export function RecordSavedPage() {
       <p className="text-center text-sm text-kiosk-muted">Thank you.</p>
       <div className="flex flex-col divide-y divide-kiosk-border rounded-2xl border border-kiosk-border bg-kiosk-panel">
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
-        <Row label="Odometer" value={`${trip.odometerOut.toLocaleString()} km`} />
+        <Row
+          label="Odometer"
+          value={
+            trip.odometerOut === undefined
+              ? "Reported — an admin will enter it"
+              : `${trip.odometerOut.toLocaleString()} km`
+          }
+        />
         <Row label="Driver" value={driver.name} />
         <Row label="Time" value={formatTimestamp(trip.outTime)} />
       </div>

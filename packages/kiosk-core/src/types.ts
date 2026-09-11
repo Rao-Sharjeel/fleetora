@@ -84,7 +84,11 @@ export interface GateInPayload {
 export interface CreateFuelEntryPayload {
   vehicleId: string;
   driverId: string;
-  odometer: number;
+  /** Omitted when the attendant could not get a reading — send
+   * `odometerIssuePhoto` instead and an admin resolves it later. */
+  odometer?: number;
+  odometerIssuePhoto?: string;
+  odometerIssueAttempts?: number;
   fuelType: "petrol" | "diesel" | "other";
   litres: number;
   ratePerLitre: number;
