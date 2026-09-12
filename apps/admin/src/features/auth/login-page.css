@@ -71,7 +71,7 @@
 
 .fx-wordmark {
   display: block;
-  width: clamp(15rem, 22vw, 19rem);
+  width: clamp(17rem, 25vw, 22rem);
   height: auto;
 }
 
@@ -179,7 +179,9 @@
 
 .fx-panel-wordmark {
   display: block;
-  width: 11rem;
+  /* Wider than the plain wordmark needed: the artwork now includes a
+     strapline, which is unreadable much below this. */
+  width: 14.5rem;
   height: auto;
 }
 

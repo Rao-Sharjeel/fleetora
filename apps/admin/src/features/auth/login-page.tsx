@@ -56,9 +56,14 @@ export function LoginPage() {
       <div className="fx-scrim-mobile" aria-hidden />
 
       <header className="fx-brand">
-        {/* <img className="fx-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" /> */}
-        <img className="fx-wordmark" src="/drive-logo.png" alt="D-RIVE" />
-        <p className="fx-brand-sub">Intelligent Fleet Management System</p>
+        {/* This artwork carries its own strapline ("Dynamic Resource &
+            Intelligent Vehicle Ecosystem"), so the separate fx-brand-sub line
+            that used to sit here would read as a second, competing tagline. */}
+        <img
+          className="fx-wordmark"
+          src="/drive-logo-tagline.png"
+          alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
+        />
         <p className="fx-powered">
           powered by
           <img className="fx-sigma" src="/sigma-soft-logo.png" alt="" />
@@ -76,8 +81,14 @@ export function LoginPage() {
           </div>
 
           <div className="fx-panel-brand">
-            {/* <img className="fx-panel-wordmark" src="/fleetora-wordmark.png" alt="Fleetora" /> */}
-            <img className="fx-panel-wordmark" src="/drive-logo.png" alt="D-RIVE" />
+            {/* This is the mobile-only brand slot — the header above is hidden
+                on narrow screens — so it carries the same strapline artwork,
+                sized so the strapline is actually legible. */}
+            <img
+              className="fx-panel-wordmark"
+              src="/drive-logo-tagline.png"
+              alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
+            />
           </div>
 
           <p className="fx-eyebrow">Fleet operations console</p>
