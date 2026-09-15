@@ -4,7 +4,7 @@ import { configureKiosk, DeviceGate, MobileOnlyGate } from "@fleetora/kiosk-core
 import "./index.css";
 import App from "./App.tsx";
 
-configureKiosk({ wordmark: "FUEL" });
+configureKiosk({ wordmark: "FUEL", app: "fuel" });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

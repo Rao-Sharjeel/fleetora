@@ -129,7 +129,10 @@ DATABASES = {
 # Both dev and prod need this — the kiosk apps authenticate via this custom
 # header, which isn't in corsheaders' default allow-list. Lives here (not just
 # dev.py) so prod.py inherits it automatically instead of needing its own copy.
-CORS_ALLOW_HEADERS = [*default_headers, "x-kiosk-api-key"]
+# x-kiosk-install-id rides alongside it on every authenticated kiosk request
+# (see api-client.ts) — the browser's CORS preflight silently blocks the whole
+# request if a custom header isn't allow-listed here, before Django even sees it.
+CORS_ALLOW_HEADERS = [*default_headers, "x-kiosk-api-key", "x-kiosk-install-id"]
 
 AUTH_USER_MODEL = "accounts.User"
 

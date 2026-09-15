@@ -26,6 +26,17 @@ class KioskDeviceAuthentication(BaseAuthentication):
         except KioskDevice.DoesNotExist as exc:
             raise AuthenticationFailed("Invalid or inactive kiosk device.") from exc
 
+        # A key is bound to the one install that claimed it. Without this the
+        # key alone is the whole credential, so anyone who reads it off a screen
+        # can pair their own phone and file trips and fuel entries.
+        installation = request.headers.get("X-Kiosk-Install-Id")
+        if not device.installation_id:
+            raise AuthenticationFailed("This kiosk key has not been paired to a device yet.")
+        if installation != device.installation_id:
+            raise AuthenticationFailed(
+                "This kiosk key belongs to a different device. Ask an administrator to issue a new key."
+            )
+
         device.touch()
         # KioskDevice itself lives in the shared public schema (found above via
         # the search path regardless of current schema — see its model docstring),

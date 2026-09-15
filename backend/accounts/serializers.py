@@ -81,6 +81,8 @@ class UserManageSerializer(serializers.ModelSerializer):
 
 
 class KioskDeviceSerializer(serializers.ModelSerializer):
+    claimed = serializers.BooleanField(read_only=True)
+
     """List/retrieve/update surface — deliberately excludes api_key. The plaintext
     key is only ever returned once, from KioskDeviceCreateSerializer's create()
     response; there's no way to recover it after that (see KioskDeviceCreateSerializer's
@@ -88,8 +90,18 @@ class KioskDeviceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KioskDevice
-        fields = ["id", "name", "active", "last_seen_at", "created_at"]
-        read_only_fields = ["id", "last_seen_at", "created_at"]
+        fields = [
+            "id",
+            "name",
+            "app",
+            "active",
+            "claimed",
+            "claimed_at",
+            "device_label",
+            "last_seen_at",
+            "created_at",
+        ]
+        read_only_fields = ["id", "claimed", "claimed_at", "device_label", "last_seen_at", "created_at"]
 
 
 class KioskDeviceCreateSerializer(serializers.ModelSerializer):
@@ -100,5 +112,20 @@ class KioskDeviceCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KioskDevice
-        fields = ["id", "name", "active", "api_key", "created_at"]
+        fields = ["id", "name", "app", "active", "api_key", "created_at"]
         read_only_fields = ["id", "api_key", "created_at"]
+        extra_kwargs = {"app": {"required": True}}
+
+
+class KioskClaimSerializer(serializers.Serializer):
+    """A kiosk redeeming its key for the first and only time.
+
+    The key names which app it is for and is claimable exactly once; the
+    install that claims it generates the id and keeps it for good. Deliberately
+    not a ModelSerializer — nothing here is editable, it is a handshake.
+    """
+
+    api_key = serializers.CharField()
+    installation_id = serializers.CharField(max_length=64)
+    app = serializers.ChoiceField(choices=KioskDevice.App.choices)
+    device_label = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")

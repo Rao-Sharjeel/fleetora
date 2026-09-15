@@ -234,6 +234,12 @@ class Trip(models.Model):
     return_condition = models.CharField(max_length=25, choices=ReturnCondition.choices, blank=True, default="")
     remarks = models.TextField(blank=True, default="")
     expected_return = models.DateTimeField(null=True, blank=True)
+    # Which gate tablet filed this, when it came from a kiosk rather than the
+    # admin app. Only meaningful now that a key is bound to one install — before
+    # that a key said nothing about which device was holding it.
+    kiosk_device = models.ForeignKey(
+        "accounts.KioskDevice", null=True, blank=True, on_delete=models.SET_NULL, related_name="trips"
+    )
 
     def save(self, *args, **kwargs):
         if not self.trip_number:
@@ -312,6 +318,9 @@ class FuelEntry(models.Model):
     total = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
     fuel_station = models.CharField(max_length=120)
     payment_method = models.CharField(max_length=40)
+    kiosk_device = models.ForeignKey(
+        "accounts.KioskDevice", null=True, blank=True, on_delete=models.SET_NULL, related_name="fuel_entries"
+    )
     receipt_no = models.CharField(max_length=60, blank=True, default="")
     full_tank = models.BooleanField(default=True)
 

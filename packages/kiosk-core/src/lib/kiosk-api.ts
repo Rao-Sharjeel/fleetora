@@ -11,6 +11,7 @@ import type {
   OdometerReadingResult,
 } from "../types";
 import { ApiError, apiGet, apiPost } from "./api-client";
+import type { KioskApp } from "../config";
 
 /** Direct calls to the real backend, authenticated as this device (see api-client.ts).
  * Replaces the old postMessage bridge to the admin app — same function names and
@@ -60,4 +61,31 @@ export function readOdometerReading(imageDataUrl: string): Promise<OdometerReadi
 
 export async function createAlert(payload: CreateAlertPayload): Promise<void> {
   await apiPost("/alerts/", payload);
+}
+
+export interface ClaimKioskDeviceParams {
+  apiKey: string;
+  installationId: string;
+  app: KioskApp;
+  /** A short description of this browser/device, purely for telling tablets
+   * apart on the admin screen — never used to authenticate. */
+  deviceLabel: string;
+}
+
+export interface ClaimKioskDeviceResult {
+  name: string;
+  app: KioskApp;
+}
+
+/** Redeems a device key, unauthenticated (that's the point — this is how a
+ * device gets its credential). Succeeds once for a given key: the first
+ * installation id to call this owns it from then on, and a retry from that
+ * same id is a no-op success rather than an error. */
+export function claimKioskDevice(params: ClaimKioskDeviceParams): Promise<ClaimKioskDeviceResult> {
+  return apiPost<ClaimKioskDeviceResult>("/kiosk-devices/claim/", {
+    apiKey: params.apiKey,
+    installationId: params.installationId,
+    app: params.app,
+    deviceLabel: params.deviceLabel,
+  });
 }

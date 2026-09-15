@@ -1,9 +1,14 @@
+export type KioskApp = "exit" | "entry" | "fuel";
+
 interface KioskConfig {
   /** The word after FLEETORA in the header — "EXIT", "ENTRY", "FUEL". */
   wordmark: string;
+  /** Which app this is, lowercase — sent when claiming a device key so an Exit
+   * key can't be redeemed by the Fuel app, even on the same tablet. */
+  app: KioskApp;
 }
 
-let config: KioskConfig = { wordmark: "" };
+let config: KioskConfig = { wordmark: "", app: "exit" };
 
 /** Called once from each kiosk app's main.tsx, so shared chrome (the header
  * wordmark) doesn't have to be prop-drilled through every page. */

@@ -3,7 +3,9 @@ import {
   createKioskDevice,
   deleteKioskDevice,
   listKioskDevices,
+  reissueKioskDevice,
   updateKioskDevice,
+  type KioskApp,
 } from "@/services/kiosk-devices.service";
 
 export function useKioskDevices() {
@@ -13,7 +15,7 @@ export function useKioskDevices() {
 export function useCreateKioskDevice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => createKioskDevice(name),
+    mutationFn: ({ name, app }: { name: string; app: KioskApp }) => createKioskDevice(name, app),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kiosk-devices"] }),
   });
 }
@@ -21,8 +23,16 @@ export function useCreateKioskDevice() {
 export function useUpdateKioskDevice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<{ name: string; active: boolean }> }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<{ name: string; app: KioskApp; active: boolean }> }) =>
       updateKioskDevice(id, patch),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kiosk-devices"] }),
+  });
+}
+
+export function useReissueKioskDevice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => reissueKioskDevice(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kiosk-devices"] }),
   });
 }

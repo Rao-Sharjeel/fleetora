@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from accounts.permissions import allow_kiosk_or_roles, allow_roles
 from audit.models import AuditLogEntry
+from accounts.models import KioskDevice
 from fleet.models import Driver, FuelEntry, Guard, OdometerIssue, Trip, Vehicle
 from fleet.serializers import (
     DriverSerializer,
@@ -160,6 +161,8 @@ class VehicleViewSet(viewsets.ModelViewSet):
             trip.status = Trip.Status.COMPLETED
             trip.return_condition = data["return_condition"]
             trip.remarks = data.get("remarks") or trip.remarks
+            if isinstance(request.auth, KioskDevice):
+                trip.kiosk_device = request.auth
             trip.save()
 
             vehicle.status = (
@@ -273,6 +276,9 @@ class TripViewSet(viewsets.ModelViewSet):
                 status=Trip.Status.OPEN,
                 expected_return=data.get("expected_return"),
                 remarks=data.get("remarks", ""),
+                # request.auth is the KioskDevice when a gate tablet called;
+                # None when a staff member did it from the admin app.
+                kiosk_device=request.auth if isinstance(request.auth, KioskDevice) else None,
             )
 
             vehicle.status = Vehicle.Status.OUTSIDE
@@ -300,6 +306,11 @@ class FuelEntryViewSet(viewsets.ModelViewSet):
     queryset = FuelEntry.objects.select_related("vehicle", "driver").all()
     serializer_class = FuelEntrySerializer
     filterset_fields = ["vehicle", "driver"]
+
+    def perform_create(self, serializer):
+        # Same as the gate endpoints: record the tablet when one filed this.
+        device = self.request.auth if isinstance(self.request.auth, KioskDevice) else None
+        serializer.save(kiosk_device=device)
 
     def get_permissions(self):
         if self.action == "create":

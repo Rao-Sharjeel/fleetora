@@ -65,11 +65,17 @@ interface RequestOptions {
  * it unpairs immediately and lets DeviceGate fall back to the pairing screen. */
 async function requestUrl<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body } = options;
-  const apiKey = useDeviceSession.getState().apiKey;
+  const { apiKey, installationId } = useDeviceSession.getState();
 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (apiKey) headers["X-Kiosk-Api-Key"] = apiKey;
+  if (apiKey) {
+    headers["X-Kiosk-Api-Key"] = apiKey;
+    // The server checks this against the id the key was claimed with — see
+    // device-session.ts. Sent alongside the key on every request, not just at
+    // pairing, since that's what stops the key working from a second device.
+    headers["X-Kiosk-Install-Id"] = installationId;
+  }
 
   const res = await fetch(url, {
     method,
@@ -78,8 +84,12 @@ async function requestUrl<T>(url: string, options: RequestOptions = {}): Promise
   });
 
   if (res.status === 401) {
+    // Revoked, or a key that only ever belonged to a different install (the
+    // claim flow below normally prevents that from ever being paired here in
+    // the first place, but a reissued key falls back to this path too).
+    const data = await safeJson(res);
     useDeviceSession.getState().unpair();
-    throw new ApiError(401, null, "This device is no longer paired. Please pair it again.");
+    throw new ApiError(401, data, extractErrorMessage(data) ?? "This device is no longer paired. Please pair it again.");
   }
 
   const data = await safeJson(res);
