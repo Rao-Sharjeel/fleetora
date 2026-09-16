@@ -7,15 +7,21 @@ masters by code; the seed command resolves those to real objects.
 """
 
 VEHICLE_TYPES = [
-    ("VT-01", "Car", {"description": "Passenger Car / Sedan"}),
+    ("VT-01", "Car", {"description": "Passenger Car / Sedan / Hatchback"}),
     ("VT-02", "Pickup", {"description": "Single / Double Cabin"}),
     ("VT-03", "Van", {"description": "Mini / Passenger Van"}),
     ("VT-04", "Bus", {"description": "Passenger Bus"}),
     ("VT-05", "Truck", {"description": "Light / Heavy Duty Truck"}),
     ("VT-06", "Motorcycle", {"description": "Two Wheeler"}),
     ("VT-07", "Forklift", {"description": "Material Handling Vehicle"}),
+    ("VT-08", "SUV / Crossover", {"description": "Sport Utility Vehicle"}),
 ]
 
+# The Pakistani new-vehicle market: mostly Japanese-brand assemblers (Indus
+# Motor/Toyota, Honda Atlas, Pak Suzuki) alongside the Chinese/Korean entrants
+# that arrived under the 2016+ auto policy (Kia Lucky, Hyundai Nishat, Changan,
+# MG, DFSK, FAW), plus the commercial-vehicle makers actually seen on fleet
+# trucks and buses (Hino, Isuzu, JAC, Foton, Master).
 VEHICLE_MAKES = [
     ("MAKE-01", "Toyota", {"country": "Japan", "description": "Vehicle Manufacturer"}),
     ("MAKE-02", "Suzuki", {"country": "Japan", "description": "Vehicle Manufacturer"}),
@@ -23,6 +29,18 @@ VEHICLE_MAKES = [
     ("MAKE-04", "Hino", {"country": "Japan", "description": "Commercial Vehicles"}),
     ("MAKE-05", "Isuzu", {"country": "Japan", "description": "Commercial Vehicles"}),
     ("MAKE-06", "Hyundai", {"country": "South Korea", "description": "Vehicle Manufacturer"}),
+    ("MAKE-07", "Kia", {"country": "South Korea", "description": "Vehicle Manufacturer"}),
+    ("MAKE-08", "FAW", {"country": "China", "description": "Commercial Vehicles / Vans"}),
+    ("MAKE-09", "Changan", {"country": "China", "description": "Vehicle Manufacturer"}),
+    ("MAKE-10", "MG", {"country": "China / UK", "description": "Vehicle Manufacturer"}),
+    ("MAKE-11", "DFSK", {"country": "China", "description": "Vehicle Manufacturer"}),
+    ("MAKE-12", "Daihatsu", {"country": "Japan", "description": "Vehicle Manufacturer"}),
+    ("MAKE-13", "Prince", {"country": "Pakistan", "description": "Locally Assembled (Regal Automobiles)"}),
+    ("MAKE-14", "United", {"country": "Pakistan", "description": "Locally Assembled"}),
+    ("MAKE-15", "JAC", {"country": "China", "description": "Commercial Vehicles"}),
+    ("MAKE-16", "Foton", {"country": "China", "description": "Commercial Vehicles"}),
+    ("MAKE-17", "Master", {"country": "Pakistan", "description": "Commercial Vans (Master Changan)"}),
+    ("MAKE-18", "BAIC", {"country": "China", "description": "Vehicle Manufacturer"}),
 ]
 
 # (code, name, make_code, vehicle_type_code, year_from)
@@ -33,6 +51,35 @@ VEHICLE_MODELS = [
     ("MOD-04", "City", "MAKE-03", "VT-01", 2021),
     ("MOD-05", "Dutro", "MAKE-04", "VT-05", 2020),
     ("MOD-06", "N-Series", "MAKE-05", "VT-05", 2020),
+    ("MOD-07", "Yaris", "MAKE-01", "VT-01", 2020),
+    ("MOD-08", "Fortuner", "MAKE-01", "VT-08", 2021),
+    ("MOD-09", "Land Cruiser", "MAKE-01", "VT-08", 2019),
+    ("MOD-10", "Cultus", "MAKE-02", "VT-01", 2018),
+    ("MOD-11", "WagonR", "MAKE-02", "VT-01", 2019),
+    ("MOD-12", "Swift", "MAKE-02", "VT-01", 2021),
+    ("MOD-13", "Bolan", "MAKE-02", "VT-03", 2018),
+    ("MOD-14", "Ravi", "MAKE-02", "VT-02", 2018),
+    ("MOD-15", "Civic", "MAKE-03", "VT-01", 2021),
+    ("MOD-16", "BR-V", "MAKE-03", "VT-08", 2021),
+    ("MOD-17", "Elantra", "MAKE-06", "VT-01", 2021),
+    ("MOD-18", "Tucson", "MAKE-06", "VT-08", 2022),
+    ("MOD-19", "Sonata", "MAKE-06", "VT-01", 2021),
+    ("MOD-20", "Porter", "MAKE-06", "VT-02", 2021),
+    ("MOD-21", "Sportage", "MAKE-07", "VT-08", 2021),
+    ("MOD-22", "Picanto", "MAKE-07", "VT-01", 2021),
+    ("MOD-23", "Sorento", "MAKE-07", "VT-08", 2022),
+    ("MOD-24", "X-PV", "MAKE-08", "VT-03", 2020),
+    ("MOD-25", "Carrier", "MAKE-08", "VT-02", 2020),
+    ("MOD-26", "Alsvin", "MAKE-09", "VT-01", 2021),
+    ("MOD-27", "Karvaan", "MAKE-09", "VT-03", 2020),
+    ("MOD-28", "Oshan X7", "MAKE-09", "VT-08", 2022),
+    ("MOD-29", "HS", "MAKE-10", "VT-08", 2021),
+    ("MOD-30", "ZS", "MAKE-10", "VT-08", 2021),
+    ("MOD-31", "Glory", "MAKE-11", "VT-08", 2021),
+    ("MOD-32", "Coure", "MAKE-12", "VT-01", 2016),
+    ("MOD-33", "Pearl", "MAKE-13", "VT-01", 2020),
+    ("MOD-34", "Bravo", "MAKE-14", "VT-01", 2019),
+    ("MOD-35", "Alpha", "MAKE-14", "VT-02", 2020),
 ]
 
 DEPARTMENTS = [
