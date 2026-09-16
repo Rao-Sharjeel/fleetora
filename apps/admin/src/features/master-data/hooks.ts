@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createMasterDataApi } from "@/services/master-data.service";
+import { addVehicleReferenceData } from "@/services/vehicle-reference-data.service";
 import type { MasterDataCollections, MasterDataKey } from "@/types/master-data";
 import type { MasterStatus } from "@/types";
 
@@ -24,5 +25,16 @@ export function useUpdateMasterRecord<K extends MasterDataKey>(key: K) {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Partial<MasterDataCollections[K]> }) => api.update(id, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["master-data", key] }),
+  });
+}
+
+export function useAddVehicleReferenceData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addVehicleReferenceData,
+    // Only vehicleTypes/vehicleMakes/vehicleModels actually change, but
+    // invalidating the whole "master-data" prefix is simpler and harmless —
+    // TanStack Query only refetches what's currently mounted.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["master-data"] }),
   });
 }

@@ -1,8 +1,11 @@
 from rest_framework import viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from accounts.permissions import allow_roles
 from masterdata import models as m
 from masterdata import serializers as s
+from masterdata.services import add_vehicle_reference_data
 
 # Master setup is admin-only to write; everyone who can see fleet data can read it
 # (dropdowns across the app are populated from these tables).
@@ -51,3 +54,27 @@ TyreTypeViewSet = master_viewset(m.TyreTypeMaster, s.TyreTypeSerializer)
 DocumentTypeViewSet = master_viewset(m.DocumentTypeMaster, s.DocumentTypeSerializer)
 LocationSiteViewSet = master_viewset(m.LocationSiteMaster, s.LocationSiteSerializer)
 GateViewSet = master_viewset(m.GateMaster, s.GateSerializer)
+
+
+class AddVehicleReferenceDataView(APIView):
+    """POST /api/vehicle-reference-data/add/ — "Add Standard Vehicle Data"
+    button on the Master Setup screen. Admin-only, like every other write here.
+
+    Idempotent: matches by name, so a second click (or clicking it on a tenant
+    that already has some of these makes) adds only what's genuinely missing.
+    Tenant scope comes from the request the same way every other view here
+    gets it — this makes no schema decisions of its own.
+    """
+
+    permission_classes = [WRITE_ROLES]
+
+    def post(self, request):
+        result = add_vehicle_reference_data()
+        return Response(
+            {
+                "typesAdded": result.types_added,
+                "makesAdded": result.makes_added,
+                "modelsAdded": result.models_added,
+                "totalAdded": result.total,
+            }
+        )

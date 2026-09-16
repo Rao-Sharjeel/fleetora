@@ -1,5 +1,9 @@
+import { Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
+import { useAddVehicleReferenceData } from "@/features/master-data/hooks";
 import { VehicleTypePage } from "./vehicle-type-page";
 import { VehicleMakePage } from "./vehicle-make-page";
 import { VehicleModelPage } from "./vehicle-model-page";
@@ -63,9 +67,39 @@ const GROUPS = [
 ];
 
 export function MasterSetupPage() {
+  const addReferenceData = useAddVehicleReferenceData();
+
+  async function handleAddReferenceData() {
+    try {
+      const result = await addReferenceData.mutateAsync();
+      toast.success(
+        result.totalAdded === 0
+          ? "Nothing to add — all standard vehicle types, makes and models are already in Master Setup."
+          : `Added ${result.typesAdded.length} vehicle type(s), ${result.makesAdded.length} make(s) and ` +
+              `${result.modelsAdded.length} model(s).`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add reference data.");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Master Setup" description="Company-wide reference data used across vehicles, drivers, maintenance and gate operations." />
+      <PageHeader
+        title="Master Setup"
+        description="Company-wide reference data used across vehicles, drivers, maintenance and gate operations."
+        actions={
+          <Button
+            variant="outline"
+            onClick={handleAddReferenceData}
+            loading={addReferenceData.isPending}
+            loadingText="Adding…"
+            title="Adds common Pakistani-market vehicle types, makes and models (Toyota, Honda, Suzuki, FAW, ...) that aren't already here. Safe to click more than once."
+          >
+            <Sparkles className="h-4 w-4" /> Add Standard Vehicle Data
+          </Button>
+        }
+      />
       <Tabs defaultValue={GROUPS[0].value}>
         <TabsList>
           {GROUPS.map((group) => (
