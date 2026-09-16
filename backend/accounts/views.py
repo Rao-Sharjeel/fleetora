@@ -1,13 +1,9 @@
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -16,6 +12,7 @@ from accounts.models import KioskDevice, User, generate_kiosk_key
 from accounts.permissions import allow_roles
 from accounts.serializers import (
     FleetoraTokenObtainPairSerializer,
+    KioskClaimSerializer,
     KioskDeviceCreateSerializer,
     KioskDeviceSerializer,
     UserManageSerializer,
