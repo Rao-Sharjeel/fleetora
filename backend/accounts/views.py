@@ -2,19 +2,22 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from audit.models import AuditLogEntry
-from accounts.models import KioskDevice, User, generate_kiosk_key
-from accounts.permissions import allow_roles
+from accounts.models import KioskDevice, Role, User, generate_kiosk_key
+from accounts.access import AdminOnly
+from accounts.permissions_catalog import PERMISSION_GROUPS
 from accounts.serializers import (
     FleetoraTokenObtainPairSerializer,
     KioskClaimSerializer,
     KioskDeviceCreateSerializer,
     KioskDeviceSerializer,
+    RoleSerializer,
     UserManageSerializer,
     UserSerializer,
 )
@@ -36,20 +39,72 @@ class MeView(APIView):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """/api/users/ — the Users & Permissions screen. Admin-only, same as that
-    screen's own nav role restriction. User now lives in a SHARED table (see
+    """/api/users/ — the Users screen. Admin-only: managing users means handing
+    out access, which staff must never be able to do for themselves. User now lives in a SHARED table (see
     its model docstring) — get_queryset()'s tenant filter is what stops a
     tenant admin from seeing/editing every other tenant's users; there's no
     schema boundary doing that job here anymore."""
 
     serializer_class = UserManageSerializer
-    permission_classes = [allow_roles("admin")]
+    permission_classes = [AdminOnly]
 
     def get_queryset(self):
-        return User.objects.filter(tenant=self.request.user.tenant).order_by("username")
+        return (
+            User.objects.filter(tenant=self.request.user.tenant)
+            .select_related("role")
+            .prefetch_related("direct_permissions", "role__permissions")
+            .order_by("username")
+        )
 
     def perform_create(self, serializer):
         serializer.save(tenant=self.request.user.tenant)
+
+    def destroy(self, request, *args, **kwargs):
+        if self.get_object().pk == request.user.pk:
+            raise ValidationError({"detail": "You can't delete your own account."})
+        return super().destroy(request, *args, **kwargs)
+
+
+class RoleViewSet(viewsets.ModelViewSet):
+    """/api/auth/roles/ — tenant-defined permission bundles. Admin-only."""
+
+    serializer_class = RoleSerializer
+    permission_classes = [AdminOnly]
+
+    def get_queryset(self):
+        return Role.objects.filter(tenant=self.request.user.tenant).prefetch_related("permissions")
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.user.tenant)
+
+    def destroy(self, request, *args, **kwargs):
+        role = self.get_object()
+        count = role.users.count()
+        if count:
+            # Deleting it would silently strip these users of their access.
+            raise ValidationError(
+                {"detail": f"{count} user(s) still have the \"{role.name}\" role. Move them to another role first."}
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+class PermissionCatalogView(APIView):
+    """GET /api/auth/permissions/ — every permission, grouped, for the role
+    and user editors."""
+
+    permission_classes = [AdminOnly]
+
+    def get(self, request):
+        return Response(
+            [
+                {
+                    "key": group["key"],
+                    "label": group["label"],
+                    "permissions": [{"codename": c, "label": label} for c, label in group["permissions"]],
+                }
+                for group in PERMISSION_GROUPS
+            ]
+        )
 
 
 class KioskDeviceViewSet(viewsets.ModelViewSet):
@@ -58,7 +113,7 @@ class KioskDeviceViewSet(viewsets.ModelViewSet):
     using the api_key this issues, not by hitting this endpoint. Same shared-table
     tenant filtering as UserViewSet above, for the same reason."""
 
-    permission_classes = [allow_roles("admin")]
+    permission_classes = [AdminOnly]
 
     def get_queryset(self):
         return KioskDevice.objects.filter(tenant=self.request.user.tenant).order_by("-created_at")

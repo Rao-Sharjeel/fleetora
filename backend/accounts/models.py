@@ -6,6 +6,45 @@ from django.db import models
 from django.utils import timezone
 
 
+class Permission(models.Model):
+    """One entry of the permission catalog (accounts.permissions_catalog),
+    kept in the database so roles and users can reference it. Global, not per
+    tenant — the catalog is the same for everyone; what differs is who holds
+    what. Synced from the catalog on every migrate."""
+
+    codename = models.CharField(max_length=80, unique=True)
+    label = models.CharField(max_length=200)
+    group = models.CharField(max_length=80)
+
+    class Meta:
+        ordering = ["group", "codename"]
+
+    def __str__(self) -> str:
+        return self.codename
+
+
+class Role(models.Model):
+    """A tenant's named bundle of permissions. A staff user has at most one."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="roles")
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default="")
+    permissions = models.ManyToManyField(Permission, related_name="roles", blank=True)
+    # Seeded for every tenant (see permissions_catalog.SYSTEM_ROLES). Editable
+    # like any other role; the flag only records where it came from.
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [models.UniqueConstraint(fields=["tenant", "name"], name="unique_role_name_per_tenant")]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class User(AbstractUser):
     """
     The real identity behind what src/hooks/use-session.ts currently fakes —
@@ -17,24 +56,65 @@ class User(AbstractUser):
     therefore an application-code responsibility (every queryset that touches
     it must filter by tenant — see accounts/views.py) rather than a database-
     structural one like the rest of the tenant-scoped apps still get for free.
+
+    Access: an admin can do everything. A staff user can do what their one
+    role grants plus any direct permissions — direct permissions only ever
+    add, they can't take away anything the role gives.
     """
 
-    class Role(models.TextChoices):
+    class UserType(models.TextChoices):
         ADMIN = "admin"
-        FLEET_MANAGER = "fleet_manager"
-        GATE_GUARD = "gate_guard"
-        MANAGEMENT = "management"
-        DRIVER = "driver"
+        STAFF = "staff"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="users")
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=Role.choices)
+    user_type = models.CharField(max_length=10, choices=UserType.choices, default=UserType.STAFF)
+    # PROTECT: deleting a role that's still assigned would silently strip
+    # those users of access, so the API refuses and says who has it.
+    role = models.ForeignKey(Role, null=True, blank=True, on_delete=models.PROTECT, related_name="users")
+    direct_permissions = models.ManyToManyField(Permission, related_name="direct_users", blank=True)
+    # The pre-RBAC fixed role (admin / fleet_manager / ...), kept only so the
+    # migration onto roles can be reversed. Nothing reads it; drop it once
+    # the new model has run in production for a while.
+    legacy_role = models.CharField(max_length=20, blank=True, default="")
     active = models.BooleanField(default=True)
 
     @property
     def name(self) -> str:
         return self.get_full_name() or self.username
+
+    @property
+    def is_admin(self) -> bool:
+        return self.user_type == self.UserType.ADMIN
+
+    def get_effective_permissions(self) -> frozenset[str]:
+        """Every permission this user holds. Cached on the instance, which for
+        request.user means once per request."""
+        cached = getattr(self, "_effective_permissions", None)
+        if cached is not None:
+            return cached
+
+        from accounts.permissions_catalog import ALL_PERMISSIONS, expand_permissions
+
+        if self.is_admin:
+            result = frozenset(ALL_PERMISSIONS)
+        else:
+            codes = set(self.direct_permissions.values_list("codename", flat=True))
+            # A role from another tenant is never honoured, even if one were
+            # ever wrongly attached.
+            if self.role_id and self.role.tenant_id == self.tenant_id:
+                codes |= set(self.role.permissions.values_list("codename", flat=True))
+            result = frozenset(expand_permissions(codes))
+        self._effective_permissions = result
+        return result
+
+    def has_permission(self, codename: str) -> bool:
+        return codename in self.get_effective_permissions()
+
+    def has_any_permission(self, codenames) -> bool:
+        effective = self.get_effective_permissions()
+        return any(c in effective for c in codenames)
 
 
 def generate_kiosk_key() -> str:

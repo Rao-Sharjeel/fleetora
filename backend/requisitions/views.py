@@ -2,23 +2,21 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.permissions import allow_roles
+from accounts.access import PermissionRulesMixin, any_of, crud_rules
 from requisitions.models import Requisition
 from requisitions.serializers import RequisitionSerializer
 
-READ_HEAVY = allow_roles("admin", "fleet_manager", "management")
-OPERATIONAL_WRITE = allow_roles("admin", "fleet_manager")
 
-
-class RequisitionViewSet(viewsets.ModelViewSet):
+class RequisitionViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = Requisition.objects.select_related("vehicle").all()
     serializer_class = RequisitionSerializer
     filterset_fields = ["status", "department"]
 
-    def get_permissions(self):
-        if self.action in ("list", "retrieve"):
-            return [READ_HEAVY()]
-        return [OPERATIONAL_WRITE()]
+    permission_rules = crud_rules(
+        "requisitions",
+        approve=any_of("requisitions.approve"),
+        reject=any_of("requisitions.approve"),
+    )
 
     def _transition(self, request, pk, target: Requisition.Status):
         requisition = self.get_object()

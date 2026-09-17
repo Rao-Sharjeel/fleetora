@@ -4,7 +4,8 @@ from django_tenants.utils import schema_context
 
 from datetime import date, timedelta
 
-from accounts.models import KioskDevice, User
+from accounts.models import KioskDevice, Permission, Role, User
+from accounts.rbac_setup import ensure_system_roles
 from common.models import Sequence
 from common.management.commands import _master_fixtures as mf
 from documents.models import DocumentRecord
@@ -79,12 +80,13 @@ VEHICLES = [
     ),
 ]
 
+# `system_role` names a key of permissions_catalog.SYSTEM_ROLES; resolved to
+# that tenant's role below.
 USERS = [
-    dict(username="admin", email="admin@example.com", role=User.Role.ADMIN, is_staff=True, is_superuser=True),
-    dict(username="fleetmanager", email="fleet@example.com", role=User.Role.FLEET_MANAGER),
-    dict(username="gateguard", email="guard@example.com", role=User.Role.GATE_GUARD),
-    dict(username="management", email="management@example.com", role=User.Role.MANAGEMENT),
-    dict(username="driveruser", email="driver@example.com", role=User.Role.DRIVER),
+    dict(username="admin", email="admin@example.com", user_type=User.UserType.ADMIN, is_staff=True, is_superuser=True),
+    dict(username="fleetmanager", email="fleet@example.com", system_role="fleet_manager"),
+    dict(username="gateguard", email="guard@example.com", system_role="gate_guard"),
+    dict(username="management", email="management@example.com", system_role="management"),
 ]
 DEFAULT_PASSWORD = "fleetora-dev-2026"
 
@@ -114,7 +116,12 @@ class Command(BaseCommand):
             self._seed(tenant)
 
     def _seed_users_and_devices(self, tenant):
+        roles = ensure_system_roles(Role, Permission, tenant.id)
         for payload in USERS:
+            payload = dict(payload)
+            system_role = payload.pop("system_role", None)
+            if system_role:
+                payload["role"] = roles[system_role]
             user, created = User.objects.get_or_create(
                 username=payload["username"],
                 defaults={**payload, "tenant": tenant},

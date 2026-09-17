@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from accounts.permissions import allow_kiosk_or_roles, allow_roles
+from accounts.access import PermissionRulesMixin, any_of, can_read, crud_rules
 from audit.models import AuditLogEntry
 from accounts.models import KioskDevice
 from fleet.models import Driver, FuelEntry, Guard, OdometerIssue, Trip, Vehicle
@@ -27,20 +27,12 @@ from fleet.serializers import (
 )
 from fleet.services import OdometerImageTooLarge, extract_odometer_reading
 
-# Collapses down to the 5 role-permission sets that already exist in src/App.tsx's
-# <RoleGuard allow={[...]}> lists — see accounts/permissions.py.
-READ_HEAVY = allow_roles("admin", "fleet_manager", "management")
-OPERATIONAL_WRITE = allow_roles("admin", "fleet_manager")
-ADMIN_ONLY = allow_roles("admin")
-KIOSK_OR_GATE_STAFF = allow_kiosk_or_roles("admin", "fleet_manager", "gate_guard")
-# Driver/Guard list & retrieve specifically (not Vehicle/Trip/FuelEntry, which stay
-# READ_HEAVY-only — trip history and fuel cost are more sensitive than a name/ID
-# picklist): the Gate-Out screen's manual-select fallback needs a gate_guard to be
-# able to list drivers/guards, not just look one up by a scanned code.
-READ_HEAVY_OR_GATE_STAFF = allow_roles("admin", "fleet_manager", "management", "gate_guard")
+GATE_ANY = ("gate.exit", "gate.entry", "gate.fuel")
+# A gate device or a staff member doing gate work — see accounts.access.
+KIOSK_OR_GATE = any_of(*GATE_ANY, kiosk=True)
 
 
-class VehicleViewSet(viewsets.ModelViewSet):
+class VehicleViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = Vehicle.objects.prefetch_related("photos").order_by("registration_number")
     serializer_class = VehicleSerializer
     filterset_fields = ["status", "allowed_to_exit"]
@@ -53,14 +45,13 @@ class VehicleViewSet(viewsets.ModelViewSet):
             return VehicleListSerializer
         return VehicleSerializer
 
-    def get_permissions(self):
-        if self.action in ("by_code", "gate_in", "read_odometer"):
-            return [KIOSK_OR_GATE_STAFF()]
-        if self.action in ("list", "retrieve"):
-            # A gate_guard needs this for the "Currently Out" gate tile
-            # (vehicles-outside-page.tsx), not just by-code lookup.
-            return [READ_HEAVY_OR_GATE_STAFF()]
-        return [OPERATIONAL_WRITE()]
+    permission_rules = crud_rules(
+        "vehicles",
+        by_code=KIOSK_OR_GATE,
+        read_odometer=KIOSK_OR_GATE,
+        gate_in=any_of("gate.entry", kiosk=True),
+        set_allowed_to_exit=any_of("vehicles.manage_exit_access"),
+    )
 
     def destroy(self, request, *args, **kwargs):
         vehicle = self.get_object()
@@ -187,16 +178,11 @@ class VehicleViewSet(viewsets.ModelViewSet):
         return Response(TripSerializer(trip).data)
 
 
-class DriverViewSet(viewsets.ModelViewSet):
+class DriverViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = Driver.objects.all().order_by("name")
     serializer_class = DriverSerializer
 
-    def get_permissions(self):
-        if self.action == "by_code":
-            return [KIOSK_OR_GATE_STAFF()]
-        if self.action in ("list", "retrieve"):
-            return [READ_HEAVY_OR_GATE_STAFF()]
-        return [OPERATIONAL_WRITE()]
+    permission_rules = crud_rules("drivers", by_code=KIOSK_OR_GATE)
 
     def destroy(self, request, *args, **kwargs):
         driver = self.get_object()
@@ -221,16 +207,11 @@ class DriverViewSet(viewsets.ModelViewSet):
         return Response(DriverSerializer(driver).data)
 
 
-class GuardViewSet(viewsets.ModelViewSet):
+class GuardViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = Guard.objects.all().order_by("name")
     serializer_class = GuardSerializer
 
-    def get_permissions(self):
-        if self.action == "by_code":
-            return [KIOSK_OR_GATE_STAFF()]
-        if self.action in ("list", "retrieve"):
-            return [READ_HEAVY_OR_GATE_STAFF()]
-        return [ADMIN_ONLY()]
+    permission_rules = crud_rules("guards", by_code=KIOSK_OR_GATE)
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
     def by_code(self, request, code=None):
@@ -241,19 +222,17 @@ class GuardViewSet(viewsets.ModelViewSet):
         return Response(GuardSerializer(guard).data)
 
 
-class TripViewSet(viewsets.ModelViewSet):
+class TripViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = Trip.objects.all().order_by("-out_time")
     serializer_class = TripSerializer
     filterset_fields = ["status", "vehicle_id", "driver_id"]
 
-    def get_permissions(self):
-        if self.action == "gate_out":
-            return [KIOSK_OR_GATE_STAFF()]
-        if self.action in ("list", "retrieve"):
-            # A gate_guard needs this to find a vehicle's open trip at Gate-In
-            # (trips.service.ts getOpenTripForVehicle) — not just create one.
-            return [READ_HEAVY_OR_GATE_STAFF()]
-        return [OPERATIONAL_WRITE()]
+    # No plain "create": trips only ever start at the gate (gate_out).
+    permission_rules = crud_rules(
+        "trips",
+        create=any_of("trips.edit"),
+        gate_out=any_of("gate.exit", kiosk=True),
+    )
 
     @action(detail=False, methods=["post"], url_path="gate-out")
     def gate_out(self, request):
@@ -302,7 +281,7 @@ class TripViewSet(viewsets.ModelViewSet):
         return Response(TripSerializer(trip).data, status=201)
 
 
-class FuelEntryViewSet(viewsets.ModelViewSet):
+class FuelEntryViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     queryset = FuelEntry.objects.select_related("vehicle", "driver").all()
     serializer_class = FuelEntrySerializer
     filterset_fields = ["vehicle", "driver"]
@@ -312,16 +291,14 @@ class FuelEntryViewSet(viewsets.ModelViewSet):
         device = self.request.auth if isinstance(self.request.auth, KioskDevice) else None
         serializer.save(kiosk_device=device)
 
-    def get_permissions(self):
-        if self.action == "create":
-            # The Fuel kiosk posts these directly from the gate.
-            return [KIOSK_OR_GATE_STAFF()]
-        if self.action in ("list", "retrieve"):
-            return [READ_HEAVY()]
-        return [OPERATIONAL_WRITE()]
+    permission_rules = crud_rules(
+        "fuel",
+        # The Fuel kiosk posts these from the gate; the Fuel page adds them too.
+        create=any_of("fuel.create", "gate.fuel", kiosk=True),
+    )
 
 
-class OdometerIssueViewSet(viewsets.ReadOnlyModelViewSet):
+class OdometerIssueViewSet(PermissionRulesMixin, viewsets.ReadOnlyModelViewSet):
     """Odometers a guard could not get read, for an admin to resolve.
 
     Deliberately read-only plus a single `resolve` action: guards raise these
@@ -334,8 +311,11 @@ class OdometerIssueViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = OdometerIssueSerializer
     filterset_fields = ["status", "stage", "vehicle"]
 
-    def get_permissions(self):
-        return [OPERATIONAL_WRITE()]
+    permission_rules = {
+        "list": can_read("odometer_issues"),
+        "retrieve": can_read("odometer_issues"),
+        "resolve": any_of("odometer_issues.resolve"),
+    }
 
     @action(detail=True, methods=["post"])
     def resolve(self, request, pk=None):

@@ -54,7 +54,7 @@ class Command(BaseCommand):
             username=email,
             email=email,
             first_name=options["name"],
-            role=User.Role.ADMIN,
+            user_type=User.UserType.ADMIN,
             tenant=tenant,
         )
         user.set_password(password)

@@ -2,15 +2,15 @@ from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import allow_roles
+from accounts.access import Authenticated, any_of
 from masterdata import models as m
 from masterdata import serializers as s
 from masterdata.services import add_vehicle_reference_data
 
-# Master setup is admin-only to write; everyone who can see fleet data can read it
-# (dropdowns across the app are populated from these tables).
-READ_ROLES = allow_roles("admin", "fleet_manager", "management", "gate_guard")
-WRITE_ROLES = allow_roles("admin")
+# Any logged-in user can read Master Setup lists — dropdowns on nearly every
+# screen are populated from them. Changing them needs master_data.manage.
+READ_ROLES = Authenticated
+WRITE_ROLES = any_of("master_data.manage")
 
 
 class MasterViewSet(viewsets.ModelViewSet):

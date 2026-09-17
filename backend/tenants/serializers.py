@@ -42,7 +42,7 @@ class TenantCreateSerializer(serializers.Serializer):
         admin = User(
             username=validated_data["admin_email"],
             email=validated_data["admin_email"],
-            role=User.Role.ADMIN,
+            user_type=User.UserType.ADMIN,
             active=True,
             tenant=tenant,
         )

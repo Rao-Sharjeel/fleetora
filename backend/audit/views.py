@@ -1,6 +1,6 @@
 from rest_framework import mixins, viewsets
 
-from accounts.permissions import allow_roles
+from accounts.access import can_read
 from audit.models import AuditLogEntry
 from audit.serializers import AuditLogEntrySerializer
 
@@ -11,4 +11,4 @@ class AuditLogViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     queryset = AuditLogEntry.objects.all()
     serializer_class = AuditLogEntrySerializer
-    permission_classes = [allow_roles("admin")]
+    permission_classes = [can_read("audit")]
