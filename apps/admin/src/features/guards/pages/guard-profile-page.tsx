@@ -10,14 +10,14 @@ import { useGuard, useDeleteGuard } from "@/features/guards/hooks";
 import { GuardFormDialog } from "@/features/guards/components/guard-form-dialog";
 import { useTrips } from "@/features/trips/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
-import { useSession } from "@/hooks/use-session";
+import { useCan } from "@/hooks/use-session";
 import { formatDateTime, formatKm } from "@/lib/formatters";
 import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 
 export function GuardProfilePage() {
   const { guardId } = useParams<{ guardId: string }>();
   const navigate = useNavigate();
-  const role = useSession((s) => s.role);
+  const can = useCan();
   const { data: guard, isLoading } = useGuard(guardId);
   const { data: trips = [] } = useTrips();
   const { data: gates = [] } = useMasterCollection("gates");
@@ -26,7 +26,8 @@ export function GuardProfilePage() {
   if (isLoading) return <ProfileSkeleton tabs={3} />;
   if (!guard) return <p className="text-sm text-muted-foreground">Guard not found.</p>;
 
-  const canWrite = role === "admin";
+  const canEdit = can("guards.edit");
+  const canDelete = can("guards.delete");
   const guardTrips = trips.filter((t) => t.guardId === guard.id);
   const completedTrips = guardTrips.filter((t) => t.status === "completed");
   const openTrips = guardTrips.filter((t) => t.status === "open");
@@ -64,19 +65,17 @@ export function GuardProfilePage() {
           <Badge variant={guard.status === "active" ? "success" : "muted"} dot={false}>
             {guard.status === "active" ? "Active" : "Inactive"}
           </Badge>
-          {canWrite && (
-            <>
-              <GuardFormDialog mode="edit" guard={guard} />
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-                loading={deleteGuard.isPending}
-                loadingText="Deleting…"
-              >
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-            </>
+          {canEdit && <GuardFormDialog mode="edit" guard={guard} />}
+          {canDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              loading={deleteGuard.isPending}
+              loadingText="Deleting…"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
           )}
         </div>
       </div>

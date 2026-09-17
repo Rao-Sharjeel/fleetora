@@ -21,6 +21,7 @@ import {
 import type { MasterDataCollections, MasterDataKey } from "@/types/master-data";
 import type { MasterStatus } from "@/types";
 import { useCreateMasterRecord, useMasterCollection, useUpdateMasterRecord } from "@/features/master-data/hooks";
+import { useCan } from "@/hooks/use-session";
 
 interface MasterRecord {
   id: string;
@@ -61,6 +62,7 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
   const updateRecord = useUpdateMasterRecord(masterKey);
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const can = useCan();
 
   const form = useForm<TValues>({ resolver: zodResolver(schema as never) as Resolver<TValues>, defaultValues });
 
@@ -98,6 +100,7 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
     );
   }
 
+  const canManage = can("master_data.manage");
   const fullColumns: ColumnDef<T>[] = [
     ...columns,
     {
@@ -106,6 +109,7 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <Switch
+            disabled={!canManage}
             checked={row.original.status === "active"}
             onCheckedChange={(checked) => toggleStatus(row.original, checked === true)}
           />
@@ -115,15 +119,19 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
         </div>
       ),
     },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => (
-        <Button variant="ghost" size="icon" onClick={() => openEdit(row.original)} aria-label="Edit">
-          <Pencil className="h-4 w-4" />
-        </Button>
-      ),
-    },
+    ...(canManage
+      ? [
+          {
+            id: "actions",
+            header: "",
+            cell: ({ row }) => (
+              <Button variant="ghost" size="icon" onClick={() => openEdit(row.original)} aria-label="Edit">
+                <Pencil className="h-4 w-4" />
+              </Button>
+            ),
+          } satisfies ColumnDef<T>,
+        ]
+      : []),
   ];
 
   return (
@@ -132,30 +140,32 @@ export function MasterListPage<K extends MasterDataKey, T extends MasterRecord, 
         title={title}
         description={description}
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openAdd}>
-                <Plus className="h-4 w-4" /> {addLabel}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingId ? "Edit Record" : addLabel}</DialogTitle>
-              </DialogHeader>
-              <form key={editingId ?? "new"} onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-                <div className="grid gap-4 sm:grid-cols-2">{renderFields(form)}</div>
-                <DialogFooter>
-                  <Button
-                    type="submit"
-                    loading={createRecord.isPending || updateRecord.isPending}
-                    loadingText="Saving…"
-                  >
-                    Save
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          can("master_data.manage") && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={openAdd}>
+                  <Plus className="h-4 w-4" /> {addLabel}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingId ? "Edit Record" : addLabel}</DialogTitle>
+                </DialogHeader>
+                <form key={editingId ?? "new"} onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">{renderFields(form)}</div>
+                  <DialogFooter>
+                    <Button
+                      type="submit"
+                      loading={createRecord.isPending || updateRecord.isPending}
+                      loadingText="Saving…"
+                    >
+                      Save
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )
         }
       />
       <DataTable columns={fullColumns} data={records as unknown as T[]} searchPlaceholder="Search…" isLoading={isLoading} />

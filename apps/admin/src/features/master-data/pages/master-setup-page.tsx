@@ -21,6 +21,7 @@ import { PartsConsumablePage } from "./parts-consumable-page";
 import { WorkshopVendorPage } from "./workshop-vendor-page";
 import { DrivingLicenceTypePage } from "./driving-licence-type-page";
 import { DocumentTypePage } from "./document-type-page";
+import { useCan } from "@/hooks/use-session";
 
 const GROUPS = [
   {
@@ -68,6 +69,7 @@ const GROUPS = [
 
 export function MasterSetupPage() {
   const addReferenceData = useAddVehicleReferenceData();
+  const can = useCan();
 
   async function handleAddReferenceData() {
     try {
@@ -89,15 +91,17 @@ export function MasterSetupPage() {
         title="Master Setup"
         description="Company-wide reference data used across vehicles, drivers, maintenance and gate operations."
         actions={
-          <Button
-            variant="outline"
-            onClick={handleAddReferenceData}
-            loading={addReferenceData.isPending}
-            loadingText="Adding…"
-            title="Adds common Pakistani-market vehicle types, makes and models (Toyota, Honda, Suzuki, FAW, ...) that aren't already here. Safe to click more than once."
-          >
-            <Sparkles className="h-4 w-4" /> Add Standard Vehicle Data
-          </Button>
+          can("master_data.manage") && (
+            <Button
+              variant="outline"
+              onClick={handleAddReferenceData}
+              loading={addReferenceData.isPending}
+              loadingText="Adding…"
+              title="Adds common Pakistani-market vehicle types, makes and models (Toyota, Honda, Suzuki, FAW, ...) that aren't already here. Safe to click more than once."
+            >
+              <Sparkles className="h-4 w-4" /> Add Standard Vehicle Data
+            </Button>
+          )
         }
       />
       <Tabs defaultValue={GROUPS[0].value}>

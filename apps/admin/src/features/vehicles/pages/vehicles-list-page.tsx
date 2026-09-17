@@ -10,6 +10,7 @@ import { VehicleFormDialog } from "@/features/vehicles/components/vehicle-form-d
 import type { Vehicle } from "@/types";
 import { formatKm } from "@/lib/formatters";
 import { printVehicleQrLabel } from "@/lib/qr-print";
+import { useCan } from "@/hooks/use-session";
 
 const columns: ColumnDef<Vehicle>[] = [
   { accessorKey: "internalId", header: "ID" },
@@ -53,6 +54,7 @@ const columns: ColumnDef<Vehicle>[] = [
 ];
 
 export function VehiclesListPage() {
+  const can = useCan();
   const { data: vehicles = [], isLoading } = useVehicles();
   const navigate = useNavigate();
 
@@ -61,7 +63,7 @@ export function VehiclesListPage() {
       <PageHeader
         title="Vehicle Master"
         description="All registered vehicles and their live status. Click a row to open its profile."
-        actions={<VehicleFormDialog mode="add" />}
+        actions={can("vehicles.create") && <VehicleFormDialog mode="add" />}
       />
       <DataTable
         columns={columns}

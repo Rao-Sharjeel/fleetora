@@ -1,4 +1,5 @@
 import { useSession } from "@/hooks/use-session";
+import type { PermissionCode, UserType } from "@/types";
 
 const API_BASE_URL = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "http://localhost:8000/api").replace(
   /\/+$/,
@@ -171,7 +172,10 @@ export interface MeResponse {
   id: string;
   name: string;
   email: string;
-  role: string;
+  userType: UserType;
+  roleId: string | null;
+  roleName: string | null;
+  permissions: PermissionCode[];
   active: boolean;
 }
 

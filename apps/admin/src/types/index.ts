@@ -1,14 +1,27 @@
-export type Role =
-  | "admin"
-  | "fleet_manager"
-  | "gate_guard"
-  | "management"
-  | "driver";
+/** Admins can do everything; staff get their role's permissions plus any direct ones. */
+export type UserType = "admin" | "staff";
 
-export interface RoleDefinition {
-  id: Role;
+/** A permission codename from the backend catalog, e.g. "drivers.edit". */
+export type PermissionCode = string;
+
+export interface PermissionDefinition {
+  codename: PermissionCode;
   label: string;
+}
+
+export interface PermissionGroup {
+  key: string;
+  label: string;
+  permissions: PermissionDefinition[];
+}
+
+export interface Role {
+  id: string;
+  name: string;
   description: string;
+  permissions: PermissionCode[];
+  isSystem: boolean;
+  userCount: number;
 }
 
 export type VehicleStatus = "available" | "outside" | "workshop" | "inactive";
@@ -262,7 +275,11 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
-  role: Role;
+  userType: UserType;
+  roleId: string | null;
+  roleName: string | null;
+  directPermissions: PermissionCode[];
+  effectivePermissions: PermissionCode[];
   active: boolean;
 }
 

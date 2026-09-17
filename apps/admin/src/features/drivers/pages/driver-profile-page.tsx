@@ -14,7 +14,7 @@ import { useTrips } from "@/features/trips/hooks";
 import { useFuelEntries } from "@/features/fuel/hooks";
 import { useDocuments } from "@/features/documents/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
-import { useSession } from "@/hooks/use-session";
+import { useCan } from "@/hooks/use-session";
 import { licenceStatus } from "@/services/drivers.service";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
 import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
@@ -22,7 +22,7 @@ import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 export function DriverProfilePage() {
   const { driverId } = useParams<{ driverId: string }>();
   const navigate = useNavigate();
-  const role = useSession((s) => s.role);
+  const can = useCan();
   const { data: driver, isLoading } = useDriver(driverId);
   const { data: assignedVehicle } = useVehicle(driver?.assignedVehicleId);
   const { data: trips = [] } = useTrips();
@@ -34,7 +34,8 @@ export function DriverProfilePage() {
   if (isLoading) return <ProfileSkeleton tabs={4} />;
   if (!driver) return <p className="text-sm text-muted-foreground">Driver not found.</p>;
 
-  const canWrite = role === "admin" || role === "fleet_manager";
+  const canEdit = can("drivers.edit");
+  const canDelete = can("drivers.delete");
 
   const driverTrips = trips.filter((t) => t.driverId === driver.id);
   const driverFuel = fuelEntries.filter((f) => f.driverId === driver.id);
@@ -76,19 +77,17 @@ export function DriverProfilePage() {
           <Badge variant={driver.status === "active" ? "success" : "muted"} dot={false}>
             {driver.status === "active" ? "Active" : "Inactive"}
           </Badge>
-          {canWrite && (
-            <>
-              <DriverFormDialog mode="edit" driver={driver} />
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDelete}
-                loading={deleteDriver.isPending}
-                loadingText="Deleting…"
-              >
-                <Trash2 className="h-4 w-4" /> Delete
-              </Button>
-            </>
+          {canEdit && <DriverFormDialog mode="edit" driver={driver} />}
+          {canDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              loading={deleteDriver.isPending}
+              loadingText="Deleting…"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
           )}
         </div>
       </div>

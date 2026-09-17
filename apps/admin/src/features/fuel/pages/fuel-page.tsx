@@ -11,11 +11,13 @@ import { useVehicles } from "@/features/vehicles/hooks";
 import { FuelEntryForm } from "@/features/fuel/components/fuel-entry-form";
 import { formatCurrency, formatDateTime, formatKm } from "@/lib/formatters";
 import type { FuelEntry } from "@/types";
+import { useCan } from "@/hooks/use-session";
 
 export function FuelPage() {
   const { data: entries = [], isLoading } = useFuelEntries();
   const { data: vehicles = [] } = useVehicles();
   const [open, setOpen] = useState(false);
+  const can = useCan();
 
   const totalLitres = entries.reduce((sum, e) => sum + e.litres, 0);
   const totalCost = entries.reduce((sum, e) => sum + e.total, 0);
@@ -41,19 +43,21 @@ export function FuelPage() {
         title="Fuel Management"
         description="Fuel entries, cost and consumption tracking."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4" /> New Fuel Entry
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>New Fuel Entry</DialogTitle>
-              </DialogHeader>
-              <FuelEntryForm onSaved={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
+          can("fuel.create") && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4" /> New Fuel Entry
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>New Fuel Entry</DialogTitle>
+                </DialogHeader>
+                <FuelEntryForm onSaved={() => setOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          )
         }
       />
 

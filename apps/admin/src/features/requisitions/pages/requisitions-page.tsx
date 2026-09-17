@@ -24,6 +24,7 @@ import { useCreateRequisition, useRequisitions } from "@/features/requisitions/h
 import { useMasterCollection } from "@/features/master-data/hooks";
 import type { Requisition } from "@/types";
 import { formatDateTime } from "@/lib/formatters";
+import { useCan } from "@/hooks/use-session";
 
 const schema = z.object({
   requestedBy: z.string().min(1, "Required"),
@@ -60,6 +61,7 @@ export function RequisitionsPage() {
   const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
   const createRequisition = useCreateRequisition();
   const [open, setOpen] = useState(false);
+  const can = useCan();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -83,68 +85,70 @@ export function RequisitionsPage() {
         title="Vehicle Requisition & Authorization"
         description="Prior authorization requests for vehicle use, before Gate-Out."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4" /> New Requisition
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Vehicle Requisition</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-                <FormField label="Requested By" error={form.formState.errors.requestedBy?.message}>
-                  <Input {...form.register("requestedBy")} placeholder="e.g. Accounts" />
-                </FormField>
-                <FormField label="Department" error={form.formState.errors.department?.message}>
-                  <Select onValueChange={(v) => form.setValue("department", v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={d.name}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-                <FormField label="Purpose" error={form.formState.errors.purpose?.message}>
-                  <Select onValueChange={(v) => form.setValue("purpose", v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select purpose" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {purposes.map((p) => (
-                        <SelectItem key={p.id} value={p.name}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-                <FormField label="Destination" error={form.formState.errors.destination?.message}>
-                  <Input {...form.register("destination")} placeholder="e.g. Gulberg, Lahore" />
-                </FormField>
-                <FormField label="Required Date/Time" error={form.formState.errors.requiredDateTime?.message}>
-                  <Input type="datetime-local" {...form.register("requiredDateTime")} />
-                </FormField>
-                <FormField label="Expected Return (optional)">
-                  <Input type="datetime-local" {...form.register("expectedReturn")} />
-                </FormField>
-                <FormField label="Approver (optional)">
-                  <Input {...form.register("approver")} placeholder="e.g. Fleet Manager" />
-                </FormField>
-                <DialogFooter>
-                  <Button type="submit" loading={createRequisition.isPending} loadingText="Submitting…">
-                    Submit Requisition
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          can("requisitions.create") && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4" /> New Requisition
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Vehicle Requisition</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                  <FormField label="Requested By" error={form.formState.errors.requestedBy?.message}>
+                    <Input {...form.register("requestedBy")} placeholder="e.g. Accounts" />
+                  </FormField>
+                  <FormField label="Department" error={form.formState.errors.department?.message}>
+                    <Select onValueChange={(v) => form.setValue("department", v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((d) => (
+                          <SelectItem key={d.id} value={d.name}>
+                            {d.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Purpose" error={form.formState.errors.purpose?.message}>
+                    <Select onValueChange={(v) => form.setValue("purpose", v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select purpose" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {purposes.map((p) => (
+                          <SelectItem key={p.id} value={p.name}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Destination" error={form.formState.errors.destination?.message}>
+                    <Input {...form.register("destination")} placeholder="e.g. Gulberg, Lahore" />
+                  </FormField>
+                  <FormField label="Required Date/Time" error={form.formState.errors.requiredDateTime?.message}>
+                    <Input type="datetime-local" {...form.register("requiredDateTime")} />
+                  </FormField>
+                  <FormField label="Expected Return (optional)">
+                    <Input type="datetime-local" {...form.register("expectedReturn")} />
+                  </FormField>
+                  <FormField label="Approver (optional)">
+                    <Input {...form.register("approver")} placeholder="e.g. Fleet Manager" />
+                  </FormField>
+                  <DialogFooter>
+                    <Button type="submit" loading={createRequisition.isPending} loadingText="Submitting…">
+                      Submit Requisition
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )
         }
       />
       <DataTable columns={columns} data={requisitions} searchPlaceholder="Search requisitions…" isLoading={isLoading} />

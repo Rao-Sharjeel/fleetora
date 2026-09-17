@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
-import { defaultRouteForRole } from "@/routes/nav-config";
+import { defaultRouteFor } from "@/routes/nav-config";
 import "./login-page.css";
 
 /** Depot clock. Gate, trip and fuel records are all timestamped, so the operator
@@ -41,7 +41,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
-      navigate(defaultRouteForRole(useSession.getState().role));
+      navigate(defaultRouteFor(useSession.getState()));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not sign in. Please try again.");
     } finally {

@@ -1,7 +1,7 @@
-import { LogOut } from "lucide-react";
+import { DoorOpen, LogOut } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { navItemsForRole } from "@/routes/nav-config";
+import { gateTilesFor, navItemsFor } from "@/routes/nav-config";
 import { useSession } from "@/hooks/use-session";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { UnsupportedDeviceScreen } from "@/components/layout/unsupported-device-screen";
@@ -9,8 +9,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 export function AppShell() {
-  const { role, userName, logout } = useSession();
-  const navItems = navItemsForRole(role);
+  const { userType, permissions, roleName, userName, logout } = useSession();
+  const navItems = navItemsFor({ userType, permissions });
+  // Staff with gate duties and office screens need a way across.
+  const gatePath = userType === "admin" ? undefined : gateTilesFor({ userType, permissions })[0]?.path;
   const isMobile = useIsMobile();
   const navigate = useNavigate();
 
@@ -59,6 +61,15 @@ export function AppShell() {
               )}
             </NavLink>
           ))}
+          {gatePath && (
+            <NavLink
+              to={gatePath}
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-sidebar-foreground"
+            >
+              <DoorOpen className="h-4 w-4 shrink-0" />
+              Gate Control
+            </NavLink>
+          )}
         </nav>
         <div className="border-t border-sidebar-border px-5 py-4 font-tabular text-[0.6875rem] tracking-wide text-sidebar-muted-foreground">
           Developed by{" "}
@@ -76,6 +87,12 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 shrink-0 items-center justify-end border-b border-border bg-card/70 px-4 backdrop-blur sm:px-6">
           <div className="flex items-center gap-2">
+            <div className="hidden text-right leading-tight sm:block">
+              <div className="text-sm font-medium">{userName}</div>
+              <div className="text-xs text-muted-foreground">
+                {userType === "admin" ? "Administrator" : (roleName ?? "Staff")}
+              </div>
+            </div>
             <Avatar>
               <AvatarFallback>{userName.slice(0, 1)}</AvatarFallback>
             </Avatar>

@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
 import { GateShell } from "@/components/layout/gate-shell";
-import { RoleGuard } from "@/components/layout/role-guard";
+import { AuthGuard, PermissionGuard } from "@/components/layout/permission-guard";
 import { DashboardPage } from "@/features/dashboard/pages/dashboard-page";
 import { VehiclesListPage } from "@/features/vehicles/pages/vehicles-list-page";
 import { VehicleProfilePage } from "@/features/vehicles/pages/vehicle-profile-page";
@@ -26,228 +27,274 @@ import { SettingsPage } from "@/features/settings/pages/settings-page";
 import { MasterSetupPage } from "@/features/master-data/pages/master-setup-page";
 import { GateOutPage } from "@/features/gate-out/pages/gate-out-page";
 import { GateInPage } from "@/features/gate-in/pages/gate-in-page";
-import { DriverPortalPage } from "@/features/auth/driver-portal-page";
+import { NoAccessPage } from "@/features/auth/no-access-page";
 import { LoginPage } from "@/features/auth/login-page";
 import { useSession } from "@/hooks/use-session";
-import { defaultRouteForRole } from "@/routes/nav-config";
+import { ADMIN_ONLY, GATE_PERMISSIONS, defaultRouteFor } from "@/routes/nav-config";
 import { OdometerIssuesPage } from "@/features/odometer-issues/pages/odometer-issues-page";
 
 function HomeRedirect() {
-  const role = useSession((s) => s.role);
-  return <Navigate to={defaultRouteForRole(role)} replace />;
+  const { isAuthenticated, userType, permissions } = useSession();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Navigate to={defaultRouteFor({ userType, permissions })} replace />;
+}
+
+/** Picks up role/permission changes an admin made since this user signed in. */
+function useProfileRefresh() {
+  const isAuthenticated = useSession((s) => s.isAuthenticated);
+  const refreshProfile = useSession((s) => s.refreshProfile);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const refresh = () => void refreshProfile().catch(() => {});
+    refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [isAuthenticated, refreshProfile]);
 }
 
 export default function App() {
+  useProfileRefresh();
   return (
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
 
       <Route
         element={
-          <RoleGuard allow={["admin", "fleet_manager", "management", "driver"]}>
+          <AuthGuard>
             <AppShell />
-          </RoleGuard>
+          </AuthGuard>
         }
       >
         <Route
           path="/dashboard"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["dashboard.view"]}>
               <DashboardPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/vehicles"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["vehicles.view"]}>
               <VehiclesListPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/vehicles/:vehicleId"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["vehicles.view"]}>
               <VehicleProfilePage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/drivers"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["drivers.view"]}>
               <DriversListPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/drivers/:driverId"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["drivers.view"]}>
               <DriverProfilePage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/guards"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={["guards.view"]}>
               <GuardsListPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/guards/:guardId"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={["guards.view"]}>
               <GuardProfilePage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/requisitions"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["requisitions.view"]}>
               <RequisitionsPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/vehicles-outside"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["trips.view"]}>
               <VehiclesOutsidePage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/trips"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["trips.view"]}>
               <TripRegisterPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/fuel"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["fuel.view"]}>
               <FuelPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/maintenance"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["maintenance.view"]}>
               <MaintenancePage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/tyres"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["tyres.view"]}>
               <TyresPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/documents"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["documents.view"]}>
               <DocumentsPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/alerts"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["alerts.view"]}>
               <AlertsPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/reports"
           element={
-            <RoleGuard allow={["admin", "fleet_manager", "management"]}>
+            <PermissionGuard anyOf={["reports.view"]}>
               <ReportsPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/master-data"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={["master_data.view"]}>
               <MasterSetupPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/odometer-issues"
           element={
-            <RoleGuard allow={["admin", "fleet_manager"]}>
+            <PermissionGuard anyOf={["odometer_issues.view"]}>
               <OdometerIssuesPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/users"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={[ADMIN_ONLY]}>
               <UsersPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/kiosk-devices"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={[ADMIN_ONLY]}>
               <KioskDevicesPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/audit"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={["audit.view"]}>
               <AuditPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
         <Route
           path="/settings"
           element={
-            <RoleGuard allow={["admin"]}>
+            <PermissionGuard anyOf={["settings.view"]}>
               <SettingsPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/my-trips"
-          element={
-            <RoleGuard allow={["driver"]}>
-              <DriverPortalPage />
-            </RoleGuard>
+            </PermissionGuard>
           }
         />
       </Route>
 
       <Route
         element={
-          <RoleGuard allow={["gate_guard"]}>
+          <PermissionGuard anyOf={GATE_PERMISSIONS}>
             <GateShell />
-          </RoleGuard>
+          </PermissionGuard>
         }
       >
-        <Route path="/gate/out" element={<GateOutPage />} />
-        <Route path="/gate/in" element={<GateInPage />} />
-        <Route path="/gate/outside" element={<VehiclesOutsidePage />} />
-        <Route path="/gate/fuel" element={<GateFuelEntryPage />} />
+        <Route
+          path="/gate/out"
+          element={
+            <PermissionGuard anyOf={["gate.exit"]}>
+              <GateOutPage />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/gate/in"
+          element={
+            <PermissionGuard anyOf={["gate.entry"]}>
+              <GateInPage />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/gate/outside"
+          element={
+            <PermissionGuard anyOf={["gate.exit", "gate.entry"]}>
+              <VehiclesOutsidePage />
+            </PermissionGuard>
+          }
+        />
+        <Route
+          path="/gate/fuel"
+          element={
+            <PermissionGuard anyOf={["gate.fuel"]}>
+              <GateFuelEntryPage />
+            </PermissionGuard>
+          }
+        />
       </Route>
 
+      <Route
+        path="/no-access"
+        element={
+          <AuthGuard>
+            <NoAccessPage />
+          </AuthGuard>
+        }
+      />
       <Route path="/login" element={<LoginPage />} />
 
       <Route path="*" element={<HomeRedirect />} />

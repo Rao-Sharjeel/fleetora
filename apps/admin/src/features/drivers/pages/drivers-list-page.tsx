@@ -12,6 +12,7 @@ import { DriverFormDialog } from "@/features/drivers/components/driver-form-dial
 import { licenceStatus } from "@/services/drivers.service";
 import type { Driver } from "@/types";
 import { formatDate } from "@/lib/formatters";
+import { useCan } from "@/hooks/use-session";
 
 const columns: ColumnDef<Driver>[] = [
   {
@@ -67,6 +68,7 @@ const columns: ColumnDef<Driver>[] = [
 ];
 
 export function DriversListPage() {
+  const can = useCan();
   const { data: drivers = [], isLoading } = useDrivers();
   const navigate = useNavigate();
 
@@ -75,7 +77,7 @@ export function DriversListPage() {
       <PageHeader
         title="Driver Master"
         description="Registered drivers, licence status and department assignment."
-        actions={<DriverFormDialog mode="add" />}
+        actions={can("drivers.create") && <DriverFormDialog mode="add" />}
       />
       <DataTable
         columns={columns}

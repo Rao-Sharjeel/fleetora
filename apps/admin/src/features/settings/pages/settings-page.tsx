@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings, useUpdateMaintenanceThresholds } from "@/features/settings/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
+import { useCan } from "@/hooks/use-session";
 
 const THEME_SWATCHES = [
   { label: "Primary (brass)", var: "--primary" },
@@ -103,6 +104,7 @@ export function SettingsPage() {
 function MaintenanceThresholdsCard() {
   const { data: settings, isLoading } = useSettings();
   const updateThresholds = useUpdateMaintenanceThresholds();
+  const canEdit = useCan()("settings.edit");
   const [dueSoonKm, setDueSoonKm] = useState("");
   const [urgentKm, setUrgentKm] = useState("");
 
@@ -169,12 +171,13 @@ function MaintenanceThresholdsCard() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 sm:max-w-md">
               <FormField label="Due Soon threshold (KM remaining)">
-                <Input type="number" min={0} value={dueSoonKm} onChange={(e) => setDueSoonKm(e.target.value)} />
+                <Input type="number" min={0} disabled={!canEdit} value={dueSoonKm} onChange={(e) => setDueSoonKm(e.target.value)} />
               </FormField>
               <FormField label="Urgent threshold (KM remaining)">
-                <Input type="number" min={0} value={urgentKm} onChange={(e) => setUrgentKm(e.target.value)} />
+                <Input type="number" min={0} disabled={!canEdit} value={urgentKm} onChange={(e) => setUrgentKm(e.target.value)} />
               </FormField>
             </div>
+            {canEdit && (
             <div>
               <Button
                 onClick={handleSave}
@@ -185,6 +188,7 @@ function MaintenanceThresholdsCard() {
                 Save Thresholds
               </Button>
             </div>
+            )}
           </>
         )}
       </CardContent>

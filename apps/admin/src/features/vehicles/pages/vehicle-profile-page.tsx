@@ -30,13 +30,13 @@ import { useDocuments } from "@/features/documents/hooks";
 import { useAuditLog } from "@/features/audit/hooks";
 import { formatCurrency, formatDate, formatDateTime, formatKm } from "@/lib/formatters";
 import { useMasterCollection } from "@/features/master-data/hooks";
-import { useSession } from "@/hooks/use-session";
+import { useCan } from "@/hooks/use-session";
 import { ProfileSkeleton } from "@/components/shared/profile-skeleton";
 
 export function VehicleProfilePage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
-  const role = useSession((s) => s.role);
+  const can = useCan();
   const { data: vehicle, isLoading } = useVehicle(vehicleId);
   const { data: driver } = useDriver(vehicle?.assignedDriverId);
   const { data: trips = [] } = useTrips();
@@ -56,7 +56,8 @@ export function VehicleProfilePage() {
   if (isLoading) return <ProfileSkeleton tabs={8} avatar={false} />;
   if (!vehicle) return <p className="text-sm text-muted-foreground">Vehicle not found.</p>;
 
-  const canWrite = role === "admin" || role === "fleet_manager";
+  const canEdit = can("vehicles.edit");
+  const canDelete = can("vehicles.delete");
 
   async function handleDelete() {
     if (!vehicle) return;
@@ -120,6 +121,7 @@ export function VehicleProfilePage() {
               variant={vehicle.allowedToExit ? "outline" : "destructive"}
               size="sm"
               onClick={openExitDialog}
+              disabled={!can("vehicles.manage_exit_access")}
             >
               {vehicle.allowedToExit ? (
                 <ShieldCheck className="h-4 w-4 text-success" />
@@ -129,19 +131,17 @@ export function VehicleProfilePage() {
               {vehicle.allowedToExit ? "Allowed to Exit" : "Exit Blocked"}
             </Button>
             <StatusBadge status={vehicle.status} />
-            {canWrite && (
-              <>
-                <VehicleFormDialog mode="edit" vehicle={vehicle} />
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleDelete}
-                  loading={deleteVehicle.isPending}
-                  loadingText="Deleting…"
-                >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </Button>
-              </>
+            {canEdit && <VehicleFormDialog mode="edit" vehicle={vehicle} />}
+            {canDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                loading={deleteVehicle.isPending}
+                loadingText="Deleting…"
+              >
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
             )}
           </div>
         }

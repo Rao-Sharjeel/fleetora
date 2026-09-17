@@ -10,6 +10,7 @@ import { printStaffIdCard } from "@/lib/qr-print";
 import { useGuards } from "@/features/guards/hooks";
 import { GuardFormDialog } from "@/features/guards/components/guard-form-dialog";
 import type { Guard } from "@/types";
+import { useCan } from "@/hooks/use-session";
 
 const columns: ColumnDef<Guard>[] = [
   {
@@ -67,6 +68,7 @@ const columns: ColumnDef<Guard>[] = [
 ];
 
 export function GuardsListPage() {
+  const can = useCan();
   const { data: guards = [], isLoading } = useGuards();
   const navigate = useNavigate();
 
@@ -75,7 +77,7 @@ export function GuardsListPage() {
       <PageHeader
         title="Security Guard Setup"
         description="Guards authorized to operate Gate-Out / Gate-In on the mobile app."
-        actions={<GuardFormDialog mode="add" />}
+        actions={can("guards.create") && <GuardFormDialog mode="add" />}
       />
       <DataTable
         columns={columns}

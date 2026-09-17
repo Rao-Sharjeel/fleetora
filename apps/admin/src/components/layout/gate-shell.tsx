@@ -1,8 +1,10 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { RoleSwitcher } from "@/components/layout/role-switcher";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { GATE_TILES } from "@/routes/nav-config";
+import { Button } from "@/components/ui/button";
+import { useSession } from "@/hooks/use-session";
+import { gateTilesFor, navItemsFor } from "@/routes/nav-config";
 
 /**
  * Touch-first, large-control interface for the gate/security guard device
@@ -10,6 +12,11 @@ import { GATE_TILES } from "@/routes/nav-config";
  * typing, no sidebar of secondary admin screens.
  */
 export function GateShell() {
+  const { userType, permissions, userName, logout } = useSession();
+  const tiles = gateTilesFor({ userType, permissions });
+  const officeHome = navItemsFor({ userType, permissions })[0]?.path;
+  const navigate = useNavigate();
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-sidebar px-4 text-sidebar-foreground">
@@ -22,12 +29,31 @@ export function GateShell() {
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <RoleSwitcher />
+          {officeHome && (
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link to={officeHome}>
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden sm:inline">Office</span>
+              </Link>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => {
+              logout();
+              navigate("/login");
+            }}
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Sign out {userName && `(${userName})`}</span>
+          </Button>
         </div>
       </header>
 
       <nav className="grid grid-cols-2 gap-3 border-b border-border bg-card p-3 sm:grid-cols-4">
-        {GATE_TILES.map((tile) => (
+        {tiles.map((tile) => (
           <NavLink
             key={tile.path}
             to={tile.path}

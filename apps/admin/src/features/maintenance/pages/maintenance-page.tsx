@@ -16,6 +16,7 @@ import { useMaintenanceRecords, useCreateMaintenanceRecord } from "@/features/ma
 import { useVehicles } from "@/features/vehicles/hooks";
 import { formatCurrency, formatDate, formatKm } from "@/lib/formatters";
 import type { MaintenanceCategory } from "@/types";
+import { useCan } from "@/hooks/use-session";
 
 const CATEGORIES: { value: MaintenanceCategory; label: string }[] = [
   { value: "engine", label: "Engine" },
@@ -33,6 +34,7 @@ export function MaintenancePage() {
   const { data: vehicles = [] } = useVehicles();
   const createRecord = useCreateMaintenanceRecord();
   const [open, setOpen] = useState(false);
+  const can = useCan();
 
   const [vehicleId, setVehicleId] = useState("");
   const [odometer, setOdometer] = useState("");
@@ -82,75 +84,77 @@ export function MaintenancePage() {
         title="Maintenance Management"
         description="Mileage-based service history and upcoming due alerts."
         actions={
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4" /> New Maintenance Record
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Vehicle Maintenance</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Vehicle</Label>
-                  <Select value={vehicleId} onValueChange={setVehicleId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vehicle" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vehicles.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.registrationNumber}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Odometer</Label>
-                    <Input type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Workshop / Vendor</Label>
-                    <Input value={workshop} onChange={(e) => setWorkshop(e.target.value)} />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Service Items</Label>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {CATEGORIES.map((c) => (
-                      <label key={c.value} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={categories.includes(c.value)} onCheckedChange={() => toggleCategory(c.value)} />
-                        {c.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Total Cost</Label>
-                    <Input type="number" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Next Due Odometer (optional)</Label>
-                    <Input type="number" value={nextDueOdometer} onChange={(e) => setNextDueOdometer(e.target.value)} />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Remarks</Label>
-                  <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleSave} loading={createRecord.isPending} loadingText="Saving…">
-                  Save Maintenance
+          can("maintenance.create") && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4" /> New Maintenance Record
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Vehicle Maintenance</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Vehicle</Label>
+                    <Select value={vehicleId} onValueChange={setVehicleId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vehicle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vehicles.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.registrationNumber}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Odometer</Label>
+                      <Input type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Workshop / Vendor</Label>
+                      <Input value={workshop} onChange={(e) => setWorkshop(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Service Items</Label>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {CATEGORIES.map((c) => (
+                        <label key={c.value} className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={categories.includes(c.value)} onCheckedChange={() => toggleCategory(c.value)} />
+                          {c.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Total Cost</Label>
+                      <Input type="number" value={totalCost} onChange={(e) => setTotalCost(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Next Due Odometer (optional)</Label>
+                      <Input type="number" value={nextDueOdometer} onChange={(e) => setNextDueOdometer(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Remarks</Label>
+                    <Input value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleSave} loading={createRecord.isPending} loadingText="Saving…">
+                    Save Maintenance
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )
         }
       />
 
