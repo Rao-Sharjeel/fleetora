@@ -25,6 +25,10 @@ export function buildDailySeries(trips: Trip[], fuelEntries: FuelEntry[], days =
   }
 
   for (const trip of trips) {
+    // Planned (not yet left) and cancelled trips have no outTime — they
+    // haven't contributed any real km yet, so they're skipped rather than
+    // falling into the epoch bucket.
+    if (!trip.outTime) continue;
     const key = new Date(trip.outTime).toDateString();
     const bucket = buckets.get(key);
     if (bucket) bucket.km += trip.tripKm ?? 0;

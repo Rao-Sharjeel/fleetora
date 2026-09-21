@@ -135,7 +135,12 @@ export function GuardProfilePage() {
                   {t.tripNumber} · {t.purpose} → {t.destination}
                 </p>
                 <p className="text-muted-foreground">
-                  {formatDateTime(t.outTime)} {t.tripKm != null && `· ${formatKm(t.tripKm)}`}
+                  {t.outTime
+                    ? formatDateTime(t.outTime)
+                    : t.plannedOutTime
+                      ? `Planned: ${formatDateTime(t.plannedOutTime)}`
+                      : "—"}{" "}
+                  {t.tripKm != null && `· ${formatKm(t.tripKm)}`}
                 </p>
               </>
             )}

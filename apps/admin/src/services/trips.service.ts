@@ -1,12 +1,16 @@
 import type { Trip, ReturnCondition } from "@/types";
-import { apiList, apiPost } from "@/lib/api-client";
+import { apiGet, apiList, apiPatch, apiPost } from "@/lib/api-client";
 
 export async function listTrips(): Promise<Trip[]> {
-  return apiList<Trip>("/trips/"); // backend orders by -out_time already
+  return apiList<Trip>("/trips/"); // backend orders planned-first, then most recent
 }
 
 export async function listOpenTrips(): Promise<Trip[]> {
   return apiList<Trip>("/trips/", { status: "open" });
+}
+
+export async function listPlannedTrips(): Promise<Trip[]> {
+  return apiList<Trip>("/trips/", { status: "planned" });
 }
 
 export async function getOpenTripForVehicle(vehicleId: string): Promise<Trip | undefined> {
@@ -14,22 +18,54 @@ export async function getOpenTripForVehicle(vehicleId: string): Promise<Trip | u
   return trips[0];
 }
 
+export interface PlannedTripLookup {
+  trip: Trip | null;
+  /** True when a plan exists for this vehicle but its date has passed. */
+  expired: boolean;
+}
+
+/** The gate's "is this vehicle authorized to leave today?" check — used by the
+ * office's own Gate-Out screen the same way the exit kiosk uses it. */
+export async function getPlannedTripForVehicle(vehicleId: string): Promise<PlannedTripLookup> {
+  return apiGet<PlannedTripLookup>("/trips/for-vehicle/", { vehicle_id: vehicleId });
+}
+
+export interface TripPlanPayload {
+  vehicleId: string;
+  driverId: string;
+  purpose: string;
+  destination: string;
+  requestedBy: string;
+  department: string;
+  plannedOutTime: string;
+  expectedReturn?: string;
+  remarks?: string;
+}
+
+/** Authorizes a vehicle+driver combination ahead of the gate — the Transport
+ * Incharge's Plan Trip action. The gate later only ever confirms this. */
+export async function planTrip(payload: TripPlanPayload): Promise<Trip> {
+  return apiPost<Trip>("/trips/", payload);
+}
+
+export async function updateTripPlan(id: string, patch: Partial<TripPlanPayload>): Promise<Trip> {
+  return apiPatch<Trip>(`/trips/${id}/`, patch);
+}
+
+export async function cancelTripPlan(id: string, reason?: string): Promise<Trip> {
+  return apiPost<Trip>(`/trips/${id}/cancel/`, { reason: reason || undefined });
+}
+
 export interface GateOutPayload {
   vehicleId: string;
   driverId: string;
   guardId?: string;
   odometerOut: number;
-  purpose: string;
-  destination: string;
-  requestedBy: string;
-  department: string;
-  approvedBy?: string;
-  expectedReturn?: string;
-  remarks?: string;
 }
 
-/** No duplicate active trip, no odometer regression, vehicle status/odometer updated
- * atomically — all enforced server-side now (fleet.views.TripViewSet.gate_out). */
+/** Confirms a trip already planned — the vehicle actually left. No duplicate
+ * active trip, no odometer regression, vehicle status/odometer updated
+ * atomically — all enforced server-side (fleet.views.TripViewSet.gate_out). */
 export async function createGateOut(payload: GateOutPayload): Promise<Trip> {
   return apiPost<Trip>("/trips/gate-out/", payload);
 }

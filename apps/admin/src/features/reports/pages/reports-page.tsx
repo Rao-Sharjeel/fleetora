@@ -59,7 +59,9 @@ export function ReportsPage() {
     const { start, end } = periodInterval(period, new Date());
     const inRange = (iso: string) => isWithinInterval(new Date(iso), { start, end });
 
-    const periodTrips = trips.filter((t) => inRange(t.outTime));
+    // Planned/cancelled trips have no outTime — they never actually happened,
+    // so they can't fall inside or outside a reporting period.
+    const periodTrips = trips.filter((t) => t.outTime && inRange(t.outTime));
     const periodFuel = fuelEntries.filter((f) => inRange(f.dateTime));
     const periodMaintenance = maintenanceRecords.filter((m) => inRange(m.date));
 

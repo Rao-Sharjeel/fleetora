@@ -36,7 +36,8 @@ export function RecordSavedPage() {
           }
         />
         <Row label="Driver" value={driver.name} />
-        <Row label="Time" value={formatTimestamp(trip.outTime)} />
+        {/* Always set by the gate-out confirm that got us to this screen. */}
+        <Row label="Time" value={trip.outTime ? formatTimestamp(trip.outTime) : "—"} />
       </div>
     </KioskShell>
   );

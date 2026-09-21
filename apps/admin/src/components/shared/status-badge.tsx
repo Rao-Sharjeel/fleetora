@@ -11,8 +11,10 @@ type KnownStatus =
   | TripDurationStatus
   | MaintenanceAlertStatus
   | DocumentAlertStatus
+  | "planned"
   | "open"
   | "completed"
+  | "cancelled"
   | "ok"
   | "maintenance_required"
   | "damage_incident"
@@ -36,8 +38,10 @@ const STATUS_CONFIG: Record<KnownStatus, { label: string; variant: BadgeProps["v
   expiring_soon: { label: "Expiring Soon", variant: "warning" },
   expired: { label: "Expired", variant: "destructive" },
 
+  planned: { label: "Planned", variant: "warning" },
   open: { label: "Open", variant: "secondary" },
   completed: { label: "Completed", variant: "success" },
+  cancelled: { label: "Cancelled", variant: "muted" },
 
   maintenance_required: { label: "Maintenance Required", variant: "warning" },
   damage_incident: { label: "Damage / Incident", variant: "destructive" },

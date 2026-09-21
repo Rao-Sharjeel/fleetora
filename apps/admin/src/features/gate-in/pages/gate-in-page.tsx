@@ -106,10 +106,11 @@ export function GateInPage() {
               <CardTitle>Open Trip</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 text-sm">
+              {/* getOpenTripForVehicle only ever returns an open trip, which always has outTime set. */}
               <Info label="Trip No." value={trip.tripNumber} />
-              <Info label="Out Time" value={formatTime(trip.outTime)} />
+              <Info label="Out Time" value={formatTime(trip.outTime!)} />
               <Info label="Odometer Out" value={formatKm(trip.odometerOut)} />
-              <Info label="Duration So Far" value={formatDuration(trip.outTime)} />
+              <Info label="Duration So Far" value={formatDuration(trip.outTime!)} />
             </CardContent>
           </Card>
 

@@ -7,6 +7,7 @@ export function ConfirmSavePage() {
   const guard = useExitSession((s) => s.guard);
   const driver = useExitSession((s) => s.driver);
   const vehicle = useExitSession((s) => s.vehicle);
+  const plan = useExitSession((s) => s.plan);
   const odometerGuess = useExitSession((s) => s.odometerGuess);
   const odometerIssuePhoto = useExitSession((s) => s.odometerIssuePhoto);
   const odometerAttempts = useExitSession((s) => s.odometerAttempts);
@@ -15,13 +16,16 @@ export function ConfirmSavePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!guard || !driver || !vehicle) return null;
+  if (!guard || !driver || !vehicle || !plan) return null;
 
   async function handleConfirm() {
     if (!guard || !driver || !vehicle) return;
     setBusy(true);
     setError(null);
     try {
+      // The trip itself — purpose, destination, who it's for — was already
+      // decided when the Transport Incharge planned it. This only confirms
+      // the vehicle actually left, with who's driving and the odometer.
       const trip = await createGateOut({
         vehicleId: vehicle.id,
         driverId: driver.id,
@@ -31,12 +35,6 @@ export function ConfirmSavePage() {
         ...(odometerIssuePhoto
           ? { odometerIssuePhoto, odometerIssueAttempts: odometerAttempts }
           : { odometerOut: Number(odometerGuess) }),
-        // The reference design doesn't collect a trip purpose/destination at the kiosk —
-        // these placeholders keep the shared createGateOut contract satisfied.
-        purpose: "Not Specified",
-        destination: "Not Specified",
-        requestedBy: driver.name,
-        department: "Not Specified",
       });
       setTrip(trip);
     } catch (err) {
@@ -66,6 +64,8 @@ export function ConfirmSavePage() {
         <Row label="Guard" value={`${guard.name} (${guard.guardId})`} />
         <Row label="Driver" value={`${driver.name} (${driver.employeeId})`} />
         <Row label="Vehicle No." value={vehicle.registrationNumber} />
+        <Row label="Purpose" value={plan.purpose} />
+        <Row label="Destination" value={plan.destination} />
         <Row
           label="Odometer Reading"
           value={odometerIssuePhoto ? "Reported — an admin will enter it" : `${Number(odometerGuess).toLocaleString()} km`}

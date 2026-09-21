@@ -33,7 +33,8 @@ export function DashboardPage() {
   const { data: alerts = [] } = useAlerts();
 
   const today = new Date().toDateString();
-  const tripsToday = trips.filter((t) => new Date(t.outTime).toDateString() === today);
+  // Planned/cancelled trips have no outTime yet — they haven't happened.
+  const tripsToday = trips.filter((t) => t.outTime && new Date(t.outTime).toDateString() === today);
   const fuelToday = fuelEntries.filter((f) => new Date(f.dateTime).toDateString() === today);
   const kmToday = tripsToday.reduce((sum, t) => sum + (t.tripKm ?? 0), 0);
   const fuelCostToday = fuelToday.reduce((sum, f) => sum + f.total, 0);
@@ -130,7 +131,8 @@ export function DashboardPage() {
                       {vehicle?.registrationNumber ?? trip.vehicleId}
                     </p>
                     <p className="truncate text-muted-foreground">
-                      {trip.purpose} → {trip.destination} · {formatDuration(trip.outTime)}
+                      {/* useOpenTrips() is server-filtered to status=open, which always has outTime set. */}
+                      {trip.purpose} → {trip.destination} · {formatDuration(trip.outTime!)}
                     </p>
                   </div>
                   <StatusBadge status={trip.tripDurationStatus ?? "normal"} className="shrink-0" />

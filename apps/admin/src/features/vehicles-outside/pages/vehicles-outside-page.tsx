@@ -42,13 +42,14 @@ export function VehiclesOutsidePage() {
                     <StatusBadge status={trip.tripDurationStatus ?? "normal"} />
                   </div>
                   <p className="text-sm text-muted-foreground">{driver?.name ?? trip.driverId}</p>
+                  {/* useOpenTrips() is server-filtered to status=open, which always has outTime set. */}
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <span>Out: {formatTime(trip.outTime)}</span>
+                    <span>Out: {formatTime(trip.outTime!)}</span>
                     <span>Odo: {formatKm(trip.odometerOut)}</span>
                     <span>{trip.purpose}</span>
                     <span>{trip.destination}</span>
                   </div>
-                  <p className="text-sm font-medium">{formatDuration(trip.outTime)} elapsed</p>
+                  <p className="text-sm font-medium">{formatDuration(trip.outTime!)} elapsed</p>
                 </CardContent>
               </Card>
             );

@@ -1,8 +1,9 @@
-import { ScanIdCardScreen, getVehicleByCode, createAlert, type Vehicle } from "@fleetora/kiosk-core";
+import { ScanIdCardScreen, getVehicleByCode, getPlannedTripForVehicle, createAlert, type Vehicle } from "@fleetora/kiosk-core";
 import { useExitSession } from "@/state/exit-session";
 
 export function ScanVehiclePage() {
   const setVehicle = useExitSession((s) => s.setVehicle);
+  const setPlan = useExitSession((s) => s.setPlan);
   const setStep = useExitSession((s) => s.setStep);
   const reset = useExitSession((s) => s.reset);
 
@@ -30,10 +31,17 @@ export function ScanVehiclePage() {
           return;
         }
 
-        setStep("CAPTURE_ODOMETER");
+        // Every trip is planned by the Transport Incharge before it reaches
+        // the gate now — nothing here can originate one.
+        const { trip, expired } = await getPlannedTripForVehicle(vehicle.id);
+        if (trip) {
+          setPlan(trip);
+          return;
+        }
+        setStep(expired ? "PLAN_EXPIRED_BLOCKED" : "NO_PLAN_BLOCKED");
       }}
       onCancel={reset}
-      onBack={() => setStep("DRIVER_IDENTIFIED")}
+      onBack={() => setStep("GUARD_IDENTIFIED")}
       devSkipCode="QR-VEH-001"
     />
   );

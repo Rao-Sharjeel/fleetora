@@ -7,6 +7,7 @@ import type {
   CreateFuelEntryPayload,
   FuelEntry,
   Trip,
+  PlannedTripLookup,
   CreateAlertPayload,
   OdometerReadingResult,
 } from "../types";
@@ -36,6 +37,13 @@ export function getGuardByCode(code: string): Promise<Guard | undefined> {
 
 export function getDriverByCode(code: string): Promise<Driver | undefined> {
   return byCode<Driver>(`/drivers/by-code/${encodeURIComponent(code)}/`);
+}
+
+/** The plan the Transport Incharge authorized for this vehicle today, if any —
+ * the exit kiosk calls this right after the vehicle scan, before it will show
+ * a driver step at all. See PlannedTripLookup for the three outcomes. */
+export function getPlannedTripForVehicle(vehicleId: string): Promise<PlannedTripLookup> {
+  return apiGet<PlannedTripLookup>(`/trips/for-vehicle/?vehicle_id=${encodeURIComponent(vehicleId)}`);
 }
 
 export function createGateOut(payload: GateOutPayload): Promise<Trip> {

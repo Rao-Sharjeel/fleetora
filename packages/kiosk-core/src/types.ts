@@ -41,6 +41,9 @@ export interface Driver {
   status: "active" | "inactive";
 }
 
+/** Confirms a trip already planned by the Transport Incharge — the gate no
+ * longer originates a trip's purpose/destination/etc, only that the vehicle
+ * actually left. See getPlannedTripForVehicle for the plan itself. */
 export interface GateOutPayload {
   vehicleId: string;
   driverId: string;
@@ -50,26 +53,40 @@ export interface GateOutPayload {
   odometerOut?: number;
   odometerIssuePhoto?: string;
   odometerIssueAttempts?: number;
-  purpose: string;
-  destination: string;
-  requestedBy: string;
-  department: string;
-  expectedReturn?: string;
-  remarks?: string;
 }
+
+export type TripStatus = "planned" | "open" | "completed" | "cancelled";
 
 export interface Trip {
   id: string;
   tripNumber: string;
   vehicleId: string;
+  vehicleRegistrationNumber: string;
   driverId: string;
+  driverName: string;
+  purpose: string;
+  destination: string;
+  status: TripStatus;
+  /** "expired" when a planned trip's date has passed without the vehicle
+   * leaving — never stored, computed by the backend on every read. */
+  effectiveStatus: TripStatus | "expired";
+  plannedOutTime?: string | null;
   /** null while a guard-reported unreadable odometer awaits an admin.
    * Django sends JSON null here, never an absent key. */
   odometerOut?: number | null;
   odometerIn?: number | null;
   tripKm?: number;
-  outTime: string;
+  outTime?: string | null;
   inTime?: string;
+}
+
+/** The gate's answer to "is this vehicle authorized to leave right now?" —
+ * see GET /trips/for-vehicle/ (fleet.views.TripViewSet.for_vehicle). */
+export interface PlannedTripLookup {
+  trip: Trip | null;
+  /** True when a plan exists for this vehicle but its date has passed — lets
+   * the gate tell "never planned" apart from "planned for another day". */
+  expired: boolean;
 }
 
 export type ReturnCondition = "ok" | "maintenance_required" | "damage_incident";

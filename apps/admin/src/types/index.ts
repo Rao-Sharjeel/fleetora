@@ -129,7 +129,7 @@ export interface Driver {
   };
 }
 
-export type TripStatus = "open" | "completed";
+export type TripStatus = "planned" | "open" | "completed" | "cancelled";
 export type TripDurationStatus = "normal" | "expected_soon" | "overdue";
 export type ReturnCondition = "ok" | "maintenance_required" | "damage_incident";
 
@@ -137,14 +137,22 @@ export interface Trip {
   id: string;
   tripNumber: string;
   vehicleId: string;
+  vehicleRegistrationNumber: string;
   driverId: string;
+  driverName: string;
   guardId?: string;
   purpose: string;
   destination: string;
   requestedBy: string;
   department: string;
   approvedBy?: string;
-  outTime: string;
+  /** Who planned the trip — blank for a trip that predates planned trips. */
+  createdByName: string;
+  /** When the plan says the vehicle should leave. Set at planning time; only
+   * the gate actually leaving sets outTime. */
+  plannedOutTime?: string | null;
+  /** Null until the vehicle actually leaves — see status/effectiveStatus. */
+  outTime?: string | null;
   inTime?: string;
   /** null while a guard-reported unreadable odometer awaits an admin.
    * Django sends JSON null here, never an absent key. */
@@ -152,9 +160,16 @@ export interface Trip {
   odometerIn?: number;
   tripKm?: number;
   status: TripStatus;
+  /** "expired" when a planned trip's date passed without the vehicle leaving —
+   * never stored, computed by the backend on every read. Only the gate cares
+   * about the distinction at confirm time; everywhere else this is what to
+   * show, since a plan that expired unused is not meaningfully still "planned". */
+  effectiveStatus: TripStatus | "expired";
   returnCondition?: ReturnCondition;
   remarks?: string;
   expectedReturn?: string;
+  cancelledAt?: string | null;
+  cancelReason?: string;
   /** Server-computed, never stored — see fleet.serializers.TripSerializer. */
   tripDurationStatus?: TripDurationStatus;
 }

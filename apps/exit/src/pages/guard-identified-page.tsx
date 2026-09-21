@@ -18,7 +18,7 @@ export function GuardIdentifiedPage() {
         { label: "Department", value: guard.department ?? "—" },
       ]}
       capturedAt={guardCapturedAt}
-      onContinue={() => setStep("SCAN_DRIVER")}
+      onContinue={() => setStep("SCAN_VEHICLE")}
     />
   );
 }

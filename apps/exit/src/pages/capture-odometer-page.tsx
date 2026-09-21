@@ -78,7 +78,7 @@ export function CaptureOdometerPage() {
   }
 
   return (
-    <KioskShell onBack={() => setStep("SCAN_VEHICLE")}>
+    <KioskShell onBack={() => setStep("DRIVER_IDENTIFIED")}>
       <h1 className="text-lg font-semibold">Capture Odometer Reading</h1>
       <p className="text-sm text-kiosk-muted">Point the camera at the instrument cluster — the odometer is found automatically.</p>
       {message && <p className="rounded-lg bg-kiosk-danger/10 p-2 text-center text-sm text-kiosk-danger">{message}</p>}
