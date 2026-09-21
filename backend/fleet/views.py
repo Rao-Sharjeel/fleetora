@@ -21,6 +21,7 @@ from fleet.serializers import (
     ReadOdometerSerializer,
     ResolveOdometerIssueSerializer,
     SetAllowedToExitSerializer,
+    TripPlanSerializer,
     TripSerializer,
     VehicleListSerializer,
     VehicleSerializer,
@@ -223,16 +224,111 @@ class GuardViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
 
 
 class TripViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
-    queryset = Trip.objects.all().order_by("-out_time")
+    """A trip now has a life before it ever reaches the gate: the Transport
+    Incharge plans it (create/update below, using TripPlanSerializer), a guard
+    confirms it at the gate (gate_out, using GateOutSerializer — the trip
+    already exists by then), and gate_in on VehicleViewSet closes it out.
+    create/update don't use TripSerializer for input — see its docstring.
+    """
+
+    queryset = Trip.objects.select_related("vehicle", "driver", "guard", "created_by").order_by(
+        "-planned_out_time", "-out_time"
+    )
     serializer_class = TripSerializer
     filterset_fields = ["status", "vehicle_id", "driver_id"]
 
-    # No plain "create": trips only ever start at the gate (gate_out).
     permission_rules = crud_rules(
         "trips",
-        create=any_of("trips.edit"),
+        create=any_of("trips.create"),
+        update=any_of("trips.edit"),
+        partial_update=any_of("trips.edit"),
+        destroy=any_of("trips.edit"),
+        cancel=any_of("trips.edit"),
         gate_out=any_of("gate.exit", kiosk=True),
+        for_vehicle=KIOSK_OR_GATE,
     )
+
+    def create(self, request, *args, **kwargs):
+        serializer = TripPlanSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        trip = Trip.objects.create(
+            vehicle=data["vehicle"],
+            driver=data["driver"],
+            purpose=data["purpose"],
+            destination=data["destination"],
+            requested_by=data["requested_by"],
+            department=data["department"],
+            planned_out_time=data["planned_out_time"],
+            expected_return=data.get("expected_return"),
+            remarks=data.get("remarks", ""),
+            status=Trip.Status.PLANNED,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+        return Response(TripSerializer(trip).data, status=201)
+
+    def update(self, request, *args, **kwargs):
+        trip = self.get_object()
+        if trip.status != Trip.Status.PLANNED:
+            raise ValidationError({"detail": "Only a planned trip can be edited — it has already left the gate."})
+
+        serializer = TripPlanSerializer(instance=trip, data=request.data, partial=kwargs.get("partial", False))
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        trip.vehicle = data["vehicle"]
+        trip.driver = data["driver"]
+        for field in ("purpose", "destination", "requested_by", "department", "planned_out_time", "remarks"):
+            if field in data:
+                setattr(trip, field, data[field])
+        if "expected_return" in data:
+            trip.expected_return = data["expected_return"]
+        trip.save()
+        return Response(TripSerializer(trip).data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        # A plan is cancelled, not deleted — once a trip exists it's part of
+        # the record, even if it never left the gate.
+        raise ValidationError({"detail": "Trips can't be deleted. Cancel a planned trip instead."})
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        trip = self.get_object()
+        if trip.status != Trip.Status.PLANNED:
+            raise ValidationError({"detail": "Only a planned trip can be cancelled — it has already left the gate."})
+        trip.status = Trip.Status.CANCELLED
+        trip.cancelled_at = timezone.now()
+        trip.cancel_reason = request.data.get("reason", "")
+        trip.save(update_fields=["status", "cancelled_at", "cancel_reason"])
+        return Response(TripSerializer(trip).data)
+
+    @action(detail=False, methods=["get"], url_path="for-vehicle")
+    def for_vehicle(self, request):
+        """Looks up today's planned trip for a vehicle — the gate's "is this
+        vehicle authorized to leave" check, read-only. Same rule GateOutSerializer
+        confirms with: only a plan whose planned date is today counts. Used by
+        the exit kiosk right after the vehicle QR scan, and by the admin app's
+        own Gate-Out screen, before either commits anything.
+        """
+        vehicle_id = request.query_params.get("vehicle_id")
+        if not vehicle_id:
+            raise ValidationError({"vehicle_id": "Required."})
+
+        today = timezone.localdate()
+        trip = (
+            Trip.objects.filter(vehicle_id=vehicle_id, status=Trip.Status.PLANNED, planned_out_time__date=today)
+            .order_by("planned_out_time")
+            .first()
+        )
+        if trip is not None:
+            return Response({"trip": TripSerializer(trip).data, "expired": False})
+
+        expired = Trip.objects.filter(vehicle_id=vehicle_id, status=Trip.Status.PLANNED).exists()
+        return Response({"trip": None, "expired": expired})
 
     @action(detail=False, methods=["post"], url_path="gate-out")
     def gate_out(self, request):
@@ -241,24 +337,16 @@ class TripViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
             vehicle = data["vehicle"]
+            trip = data["trip"]
 
-            trip = Trip.objects.create(
-                vehicle=vehicle,
-                driver_id=data["driver_id"],
-                guard_id=data.get("guard_id"),
-                purpose=data["purpose"],
-                destination=data["destination"],
-                requested_by=data["requested_by"],
-                department=data["department"],
-                out_time=timezone.now(),
-                odometer_out=data.get("odometer_out"),
-                status=Trip.Status.OPEN,
-                expected_return=data.get("expected_return"),
-                remarks=data.get("remarks", ""),
-                # request.auth is the KioskDevice when a gate tablet called;
-                # None when a staff member did it from the admin app.
-                kiosk_device=request.auth if isinstance(request.auth, KioskDevice) else None,
-            )
+            trip.guard_id = data.get("guard_id")
+            trip.out_time = timezone.now()
+            trip.odometer_out = data.get("odometer_out")
+            trip.status = Trip.Status.OPEN
+            # request.auth is the KioskDevice when a gate tablet called; None
+            # when a staff member confirmed it from the admin app.
+            trip.kiosk_device = request.auth if isinstance(request.auth, KioskDevice) else None
+            trip.save(update_fields=["guard", "out_time", "odometer_out", "status", "kiosk_device"])
 
             vehicle.status = Vehicle.Status.OUTSIDE
             if data.get("odometer_out") is not None:
@@ -278,7 +366,7 @@ class TripViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
                 )
                 vehicle.save(update_fields=["status"])
 
-        return Response(TripSerializer(trip).data, status=201)
+        return Response(TripSerializer(trip).data, status=200)
 
 
 class FuelEntryViewSet(PermissionRulesMixin, viewsets.ModelViewSet):

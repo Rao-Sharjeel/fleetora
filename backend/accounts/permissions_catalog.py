@@ -43,8 +43,8 @@ PERMISSION_GROUPS: list[dict] = [
     ]},
     {"key": "trips", "label": "Trips", "permissions": [
         ("trips.view", "View trip register and vehicles outside"),
-        ("trips.edit", "Edit trips"),
-        ("trips.delete", "Delete trips"),
+        ("trips.create", "Plan trips — assign a vehicle and driver, and authorize the exit"),
+        ("trips.edit", "Edit or cancel a planned trip"),
     ]},
     {"key": "requisitions", "label": "Requisitions", "permissions": [
         ("requisitions.view", "View requisitions"),
@@ -141,7 +141,7 @@ SYSTEM_ROLES: dict[str, dict] = {
             "dashboard.view",
             "vehicles.create", "vehicles.edit", "vehicles.delete", "vehicles.manage_exit_access",
             "drivers.create", "drivers.edit", "drivers.delete",
-            "trips.view", "trips.edit", "trips.delete",
+            "trips.view", "trips.create", "trips.edit",
             "requisitions.create", "requisitions.edit", "requisitions.approve",
             "fuel.create", "fuel.edit", "fuel.delete",
             "maintenance.create", "maintenance.edit", "maintenance.delete",

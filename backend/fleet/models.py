@@ -201,8 +201,10 @@ def delete_vehicle_photo_file(sender, instance, **kwargs):
 
 class Trip(models.Model):
     class Status(models.TextChoices):
+        PLANNED = "planned"
         OPEN = "open"
         COMPLETED = "completed"
+        CANCELLED = "cancelled"
 
     class ReturnCondition(models.TextChoices):
         OK = "ok"
@@ -221,8 +223,22 @@ class Trip(models.Model):
     requested_by = models.CharField(max_length=120)
     department = models.CharField(max_length=120)
     approved_by = models.CharField(max_length=120, blank=True, default="")
-    out_time = models.DateTimeField()
+    # Who planned the trip — the Transport Incharge (or another admin/staff
+    # with trips.create) authorizing this vehicle+driver combination before
+    # anyone reaches the gate. Null for trips that predate planned trips.
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    # When the plan says the vehicle should leave. Only meaningful while
+    # status=PLANNED (or as a historical record afterwards) — the gate only
+    # ever honours a plan whose date is today; see GateOutSerializer.
+    planned_out_time = models.DateTimeField(null=True, blank=True)
+    # Null while the trip is only planned — the gate fills this in once the
+    # vehicle actually leaves.
+    out_time = models.DateTimeField(null=True, blank=True)
     in_time = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_reason = models.CharField(max_length=255, blank=True, default="")
     # Nullable because a guard can report an unreadable odometer instead of
     # entering a number: the trip proceeds and an admin fills the reading in
     # from the photo. Storing the vehicle's last reading as a stand-in would
@@ -243,7 +259,7 @@ class Trip(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.trip_number:
-            year = (self.out_time or timezone.now()).year
+            year = (self.planned_out_time or self.out_time or timezone.now()).year
             self.trip_number = f"TRP-{year}-{Sequence.next('trip_number', year):06d}"
         super().save(*args, **kwargs)
 

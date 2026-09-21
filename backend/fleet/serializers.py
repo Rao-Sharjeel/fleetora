@@ -239,12 +239,28 @@ class VehicleListSerializer(VehicleSerializer):
 
 
 class TripSerializer(serializers.ModelSerializer):
+    """The read shape for a trip, at any stage from planned to cancelled. Not
+    used to accept writes any more — planning, editing and confirming an exit
+    each have their own input shape (TripPlanSerializer, GateOutSerializer)
+    because they take different fields and different rules apply; TripViewSet
+    calls those directly and returns this serializer's view of the result."""
+
     vehicle_id = SafePrimaryKeyRelatedField(source="vehicle", queryset=Vehicle.objects.all())
     driver_id = SafePrimaryKeyRelatedField(source="driver", queryset=Driver.objects.all())
     guard_id = SafePrimaryKeyRelatedField(
         source="guard", queryset=Guard.objects.all(), required=False, allow_null=True
     )
     trip_duration_status = serializers.SerializerMethodField()
+    # A planned trip past its planned date without leaving isn't a status
+    # stored on the row — the gate and the admin list both derive it from
+    # today's date on read, so nothing has to sweep expired plans. See
+    # GateOutSerializer for the gate side of this same rule.
+    effective_status = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    # Denormalized for the kiosk and the admin trip list, which both show
+    # "assigned to X" without wanting a second round trip just for a name.
+    driver_name = serializers.SerializerMethodField()
+    vehicle_registration_number = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
@@ -252,37 +268,38 @@ class TripSerializer(serializers.ModelSerializer):
             "id",
             "trip_number",
             "vehicle_id",
+            "vehicle_registration_number",
             "driver_id",
+            "driver_name",
             "guard_id",
             "purpose",
             "destination",
             "requested_by",
             "department",
             "approved_by",
+            "created_by_name",
+            "planned_out_time",
             "out_time",
             "in_time",
             "odometer_out",
             "odometer_in",
             "trip_km",
             "status",
+            "effective_status",
             "return_condition",
             "remarks",
             "expected_return",
+            "cancelled_at",
+            "cancel_reason",
             "trip_duration_status",
         ]
-        read_only_fields = [
-            "id",
-            "trip_number",
-            "status",
-            "in_time",
-            "odometer_in",
-            "trip_km",
-            "return_condition",
-        ]
+        # Every field is read-only: TripViewSet never hands request data
+        # straight to this serializer (see the class docstring above).
+        read_only_fields = [f for f in fields if f != "effective_status" and f != "trip_duration_status"]
 
     def get_trip_duration_status(self, obj: Trip) -> str:
         """Mirrors trips.service.ts's tripDurationStatus — pure, never stored."""
-        if obj.status == Trip.Status.COMPLETED:
+        if obj.status != Trip.Status.OPEN:
             return "normal"
         if obj.expected_return and timezone.now() > obj.expected_return:
             return "overdue"
@@ -290,6 +307,24 @@ class TripSerializer(serializers.ModelSerializer):
         if minutes_out > 240:
             return "expected_soon"
         return "normal"
+
+    def get_effective_status(self, obj: Trip) -> str:
+        if (
+            obj.status == Trip.Status.PLANNED
+            and obj.planned_out_time
+            and obj.planned_out_time.date() < timezone.localdate()
+        ):
+            return "expired"
+        return obj.status
+
+    def get_created_by_name(self, obj: Trip) -> str:
+        return obj.created_by.name if obj.created_by_id else ""
+
+    def get_driver_name(self, obj: Trip) -> str:
+        return obj.driver.name
+
+    def get_vehicle_registration_number(self, obj: Trip) -> str:
+        return obj.vehicle.registration_number
 
 
 class SetAllowedToExitSerializer(serializers.Serializer):
@@ -321,8 +356,93 @@ class ReadOdometerSerializer(serializers.Serializer):
             raise serializers.ValidationError("Not valid base64 image data.")
 
 
+class TripPlanSerializer(serializers.Serializer):
+    """Input for planning a trip (POST/PATCH /trips/) — the Transport Incharge
+    authorizing a vehicle+driver combination before anyone reaches the gate.
+    Distinct from TripSerializer (the read shape) and from GateOutSerializer
+    (which only confirms a plan already made); this is the one place a trip's
+    who/why/where get written down.
+
+    `instance` is the Trip being edited, when this is used for an update —
+    its own vehicle/driver/date are excluded from the double-booking checks
+    below so re-saving a plan unchanged doesn't collide with itself.
+    """
+
+    vehicle_id = serializers.UUIDField()
+    driver_id = serializers.UUIDField()
+    purpose = serializers.CharField()
+    destination = serializers.CharField()
+    requested_by = serializers.CharField()
+    department = serializers.CharField()
+    planned_out_time = serializers.DateTimeField()
+    expected_return = serializers.DateTimeField(required=False, allow_null=True)
+    remarks = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        editing = self.instance
+
+        # A PATCH only sends the fields that changed; anything missing falls
+        # back to what the trip already has, so re-checking a plan against
+        # itself uses its real, current vehicle/driver/date throughout.
+        vehicle_id = attrs.get("vehicle_id", editing.vehicle_id if editing else None)
+        driver_id = attrs.get("driver_id", editing.driver_id if editing else None)
+        planned_out_time = attrs.get("planned_out_time", editing.planned_out_time if editing else None)
+
+        try:
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+        except Vehicle.DoesNotExist:
+            raise serializers.ValidationError({"vehicle_id": "Vehicle not found."})
+        try:
+            driver = Driver.objects.get(id=driver_id)
+        except Driver.DoesNotExist:
+            raise serializers.ValidationError({"driver_id": "Driver not found."})
+
+        if not vehicle.allowed_to_exit:
+            reason = f" ({vehicle.allowed_to_exit_reason})" if vehicle.allowed_to_exit_reason else ""
+            raise serializers.ValidationError(
+                {"vehicle_id": f"{vehicle.registration_number} is blocked from exiting{reason}."}
+            )
+
+        planned_date = planned_out_time.date()
+
+        vehicle_trips = Trip.objects.filter(vehicle=vehicle).exclude(
+            status__in=(Trip.Status.COMPLETED, Trip.Status.CANCELLED)
+        )
+        driver_trips = Trip.objects.filter(driver=driver).exclude(
+            status__in=(Trip.Status.COMPLETED, Trip.Status.CANCELLED)
+        )
+        if editing is not None:
+            vehicle_trips = vehicle_trips.exclude(pk=editing.pk)
+            driver_trips = driver_trips.exclude(pk=editing.pk)
+
+        if vehicle_trips.filter(status=Trip.Status.OPEN).exists():
+            raise serializers.ValidationError({"vehicle_id": f"{vehicle.registration_number} is currently out."})
+        if vehicle_trips.filter(status=Trip.Status.PLANNED, planned_out_time__date=planned_date).exists():
+            raise serializers.ValidationError(
+                {"vehicle_id": f"{vehicle.registration_number} already has a planned trip that day."}
+            )
+        if driver_trips.filter(status=Trip.Status.OPEN).exists():
+            raise serializers.ValidationError({"driver_id": f"{driver.name} is currently out on a trip."})
+        if driver_trips.filter(status=Trip.Status.PLANNED, planned_out_time__date=planned_date).exists():
+            raise serializers.ValidationError({"driver_id": f"{driver.name} already has a planned trip that day."})
+
+        attrs["vehicle"] = vehicle
+        attrs["driver"] = driver
+        return attrs
+
+
 class GateOutSerializer(serializers.Serializer):
-    """Mirrors trips.service.ts createGateOut: no duplicate active trip, no odometer regression."""
+    """Confirms a planned trip at the gate. The trip itself — vehicle, driver,
+    purpose, destination — was already decided when the Transport Incharge
+    planned it (TripPlanSerializer); this only records that the vehicle
+    actually left, with the odometer reading and the guard on duty.
+
+    Only today's plan for this vehicle is honoured — see Trip.planned_out_time
+    and TripSerializer.get_effective_status for the same rule read back to the
+    admin app. A plan for another day isn't rejected outright so much as it
+    simply isn't found; the distinct "has expired" message below only fires
+    when there's something to tell the guard apart from "never planned".
+    """
 
     vehicle_id = serializers.UUIDField()
     driver_id = serializers.UUIDField()
@@ -332,12 +452,6 @@ class GateOutSerializer(serializers.Serializer):
     odometer_out = serializers.IntegerField(min_value=0, required=False, allow_null=True)
     odometer_issue_photo = Base64ImageField(required=False, allow_null=True)
     odometer_issue_attempts = serializers.IntegerField(min_value=0, required=False, default=0)
-    purpose = serializers.CharField()
-    destination = serializers.CharField()
-    requested_by = serializers.CharField()
-    department = serializers.CharField()
-    expected_return = serializers.DateTimeField(required=False, allow_null=True)
-    remarks = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         try:
@@ -349,6 +463,31 @@ class GateOutSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"{vehicle.registration_number} is already outside. Gate-Out is blocked."
             )
+
+        today = timezone.localdate()
+        trip = (
+            Trip.objects.select_for_update()
+            .filter(vehicle=vehicle, status=Trip.Status.PLANNED, planned_out_time__date=today)
+            .order_by("planned_out_time")
+            .first()
+        )
+        if trip is None:
+            if Trip.objects.filter(vehicle=vehicle, status=Trip.Status.PLANNED).exists():
+                raise serializers.ValidationError(
+                    {
+                        "vehicle_id": "The planned trip for this vehicle has expired. "
+                        "Ask the Transport Incharge to plan a new one."
+                    }
+                )
+            raise serializers.ValidationError(
+                {"vehicle_id": "No trip is authorized for this vehicle. Ask the Transport Incharge to plan one."}
+            )
+
+        if str(trip.driver_id) != str(attrs["driver_id"]):
+            raise serializers.ValidationError(
+                {"driver_id": f"This trip is assigned to {trip.driver.name}, not the scanned driver."}
+            )
+
         odometer = attrs.get("odometer_out")
         if odometer is None:
             if not attrs.get("odometer_issue_photo"):
@@ -362,6 +501,7 @@ class GateOutSerializer(serializers.Serializer):
             )
 
         attrs["vehicle"] = vehicle
+        attrs["trip"] = trip
         return attrs
 
 
