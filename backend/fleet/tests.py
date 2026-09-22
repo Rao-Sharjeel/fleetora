@@ -253,3 +253,53 @@ class TripPlanningTestCase(TenantAPITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.data["trip"])
         self.assertFalse(response.data["expired"])
+
+
+class VehicleForceDeleteTests(TenantAPITestCase):
+    """DELETE /api/vehicles/<id>/ — blocked while trips/fuel exist unless the
+    caller passes ?force=true, which cascades that history away too."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = self.make_user("admin1")
+        self.vehicle = Vehicle.objects.create(
+            registration_number="LEA-3333", company="Head Office", make="Toyota", model="Hilux",
+            year=2022, colour="White", fuel_type=Vehicle.FuelType.DIESEL,
+            expected_fuel_average_kmpl=10, current_odometer=50000,
+        )
+        self.driver = Driver.objects.create(
+            name="Ali Raza", company_id_code="EMP-CODE-9", cnic="12345-1234567-1", mobile="0300-1234567",
+            licence_number="LHR-001", licence_category="LTV", licence_expiry="2030-01-01", department="Sales",
+        )
+        self.trip = Trip.objects.create(
+            vehicle=self.vehicle, driver=self.driver, purpose="Errand", destination="Town",
+            requested_by="Accounts", department="Sales", out_time=timezone.now(),
+            odometer_out=50000, status=Trip.Status.OPEN,
+        )
+        self.vehicle.status = Vehicle.Status.OUTSIDE
+        self.vehicle.save(update_fields=["status"])
+
+    def test_delete_without_force_is_blocked_with_a_flag(self):
+        response = self.as_user(self.admin).delete(f"/api/vehicles/{self.vehicle.id}/")
+        self.assertEqual(response.status_code, 400)
+        # assertIs, not assertTrue: a plain Response, not ValidationError, so
+        # this must be a real bool, not DRF's ValidationError stringifying it
+        # to "True" — which the frontend's boolean check would silently miss.
+        self.assertIs(response.data["requires_force"], True)
+        self.assertIs(response.data["currently_outside"], True)
+        self.assertTrue(Vehicle.objects.filter(pk=self.vehicle.pk).exists())
+
+    def test_force_delete_removes_the_vehicle_and_its_trips(self):
+        response = self.as_user(self.admin).delete(f"/api/vehicles/{self.vehicle.id}/?force=true")
+        self.assertEqual(response.status_code, 204, response.data)
+        self.assertFalse(Vehicle.objects.filter(pk=self.vehicle.pk).exists())
+        self.assertFalse(Trip.objects.filter(pk=self.trip.pk).exists())
+
+    def test_delete_with_no_history_needs_no_force(self):
+        clean = Vehicle.objects.create(
+            registration_number="LEA-4444", company="Head Office", make="Honda", model="Civic",
+            year=2023, colour="Black", fuel_type=Vehicle.FuelType.PETROL,
+            expected_fuel_average_kmpl=12, current_odometer=100,
+        )
+        response = self.as_user(self.admin).delete(f"/api/vehicles/{clean.id}/")
+        self.assertEqual(response.status_code, 204)

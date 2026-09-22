@@ -69,9 +69,36 @@ class VehicleViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
             blockers.append(f"{n} maintenance record(s)")
         if n := vehicle.documents.count():
             blockers.append(f"{n} document(s)")
-        if blockers:
-            raise ValidationError({"detail": f"Cannot delete this vehicle — it has {', '.join(blockers)} on record."})
-        return super().destroy(request, *args, **kwargs)
+        if not blockers:
+            return super().destroy(request, *args, **kwargs)
+
+        # ?force=true means the caller has already been shown the above and
+        # confirmed it explicitly — same permission (vehicles.delete), no new
+        # confirmation the API itself can enforce beyond this flag.
+        force = str(request.query_params.get("force", "")).lower() in ("1", "true", "yes")
+        if not force:
+            # A plain Response, not ValidationError — DRF's ValidationError
+            # stringifies every value in its detail (True becomes the string
+            # "True"), which would break the frontend's boolean check on
+            # requires_force/currently_outside.
+            return Response(
+                {
+                    "detail": f"This vehicle has {', '.join(blockers)} on record.",
+                    "requires_force": True,
+                    "currently_outside": vehicle.status == Vehicle.Status.OUTSIDE,
+                },
+                status=400,
+            )
+
+        with transaction.atomic():
+            # Trip/FuelEntry are PROTECT, so they have to go first — deleting a
+            # Trip row is fine, it's only *deleting the vehicle while one still
+            # points at it* that PROTECT stops. Maintenance/documents are
+            # already CASCADE and go automatically with the vehicle below.
+            vehicle.trips.all().delete()
+            vehicle.fuel_entries.all().delete()
+            vehicle.delete()
+        return Response(status=204)
 
     @action(detail=False, methods=["get"], url_path="by-code/(?P<code>[^/]+)")
     def by_code(self, request, code=None):
