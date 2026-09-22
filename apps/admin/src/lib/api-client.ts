@@ -157,8 +157,8 @@ export function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   return request<T>(path, { method: "PATCH", body });
 }
 
-export function apiDelete(path: string): Promise<void> {
-  return request<void>(path, { method: "DELETE" });
+export function apiDelete(path: string, params?: QueryParams): Promise<void> {
+  return request<void>(path, { method: "DELETE", params });
 }
 
 // --- Auth bootstrap calls (unauthenticated, so they bypass the Authorization header above) ---

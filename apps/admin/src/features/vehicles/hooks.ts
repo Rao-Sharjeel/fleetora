@@ -41,14 +41,17 @@ export function useUpdateVehicle() {
 export function useDeleteVehicle() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteVehicle(id),
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) => deleteVehicle(id, force),
     // See useDeleteDriver's comment (features/drivers/hooks.ts) — plain
     // invalidateQueries(["vehicles"]) prefix-matches the still-mounted
     // ["vehicles", id] detail query and stalls out its retry/backoff before
     // resolving. Evict the detail entry directly instead of refetching it.
-    onSuccess: (_data, id) => {
+    onSuccess: (_data, { id }) => {
       queryClient.removeQueries({ queryKey: ["vehicles", id] });
       queryClient.invalidateQueries({ queryKey: ["vehicles"], exact: true });
+      // A force-delete also removed its trips and fuel entries.
+      queryClient.invalidateQueries({ queryKey: ["trips"] });
+      queryClient.invalidateQueries({ queryKey: ["fuel"] });
     },
   });
 }

@@ -34,8 +34,31 @@ export async function updateVehicle(id: string, patch: UpdateVehiclePayload): Pr
   return apiPatch<Vehicle>(`/vehicles/${id}/`, body);
 }
 
-export async function deleteVehicle(id: string): Promise<void> {
-  return apiDelete(`/vehicles/${id}/`);
+/** `force: true` also deletes the vehicle's trip and fuel history — the
+ * server refuses without it, returning `requiresForce`/`currentlyOutside`
+ * (see DeleteBlockedError below) so the caller can show a second, explicit
+ * confirmation before retrying with it. */
+export async function deleteVehicle(id: string, force = false): Promise<void> {
+  return apiDelete(`/vehicles/${id}/`, force ? { force: "true" } : undefined);
+}
+
+export interface DeleteBlockedBody {
+  detail: string;
+  requiresForce?: boolean;
+  currentlyOutside?: boolean;
+}
+
+/** True when a deleteVehicle() failure is the "has history, needs ?force"
+ * refusal rather than an unrelated error (permissions, network, …). */
+export function isDeleteBlocked(err: unknown): err is ApiError & { body: DeleteBlockedBody } {
+  return (
+    err instanceof ApiError &&
+    err.status === 400 &&
+    typeof err.body === "object" &&
+    err.body !== null &&
+    "requiresForce" in err.body &&
+    (err.body as DeleteBlockedBody).requiresForce === true
+  );
 }
 
 export async function getVehicleByCode(code: string): Promise<Vehicle | undefined> {

@@ -19,6 +19,7 @@ import { InfoCard, ListCard } from "@/components/shared/profile-cards";
 import { FormField } from "@/components/shared/form-field";
 import { printVehicleQrLabel } from "@/lib/qr-print";
 import { useVehicle, useSetAllowedToExit, useDeleteVehicle } from "@/features/vehicles/hooks";
+import { isDeleteBlocked } from "@/services/vehicles.service";
 import { VehicleFormDialog } from "@/features/vehicles/components/vehicle-form-dialog";
 import { VehiclePhotoGallery } from "@/features/vehicles/components/vehicle-photo-gallery";
 import { useDriver } from "@/features/drivers/hooks";
@@ -63,10 +64,32 @@ export function VehicleProfilePage() {
     if (!vehicle) return;
     if (!window.confirm(`Delete "${vehicle.registrationNumber}"? This can't be undone.`)) return;
     try {
-      await deleteVehicle.mutateAsync(vehicle.id);
+      await deleteVehicle.mutateAsync({ id: vehicle.id });
       toast.success(`${vehicle.registrationNumber} deleted.`);
       navigate("/vehicles");
     } catch (err) {
+      // The server refuses a vehicle with trip/fuel history unless told to
+      // force it — that's a second, more specific confirmation, not a
+      // generic error, since force-deleting also deletes that history.
+      if (isDeleteBlocked(err)) {
+        const { detail, currentlyOutside } = err.body;
+        const warning = currentlyOutside
+          ? `${vehicle.registrationNumber} is currently outside on an open trip. `
+          : "";
+        const confirmed = window.confirm(
+          `${detail}\n\n${warning}Deleting anyway will also permanently delete all of its trip and fuel ` +
+            `history. This can't be undone. Delete "${vehicle.registrationNumber}" and its history?`,
+        );
+        if (!confirmed) return;
+        try {
+          await deleteVehicle.mutateAsync({ id: vehicle.id, force: true });
+          toast.success(`${vehicle.registrationNumber} and its trip/fuel history deleted.`);
+          navigate("/vehicles");
+        } catch (retryErr) {
+          toast.error(retryErr instanceof Error ? retryErr.message : "Failed to delete vehicle.");
+        }
+        return;
+      }
       toast.error(err instanceof Error ? err.message : "Failed to delete vehicle.");
     }
   }
