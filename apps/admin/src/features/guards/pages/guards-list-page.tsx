@@ -54,9 +54,11 @@ const columns: ColumnDef<Guard>[] = [
         onClick={(e) => {
           e.stopPropagation();
           printStaffIdCard({
+            variant: "guard",
             id: row.original.guardId,
             name: row.original.name,
-            role: row.original.guardType,
+            cnic: row.original.cnic,
+            mobile: row.original.mobile,
             photoUrl: row.original.photoUrl,
           });
         }}

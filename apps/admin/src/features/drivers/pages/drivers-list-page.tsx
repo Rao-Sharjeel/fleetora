@@ -54,9 +54,11 @@ const columns: ColumnDef<Driver>[] = [
         onClick={(e) => {
           e.stopPropagation();
           printStaffIdCard({
+            variant: "driver",
             id: row.original.employeeId,
             name: row.original.name,
-            role: "Driver",
+            cnic: row.original.cnic,
+            mobile: row.original.mobile,
             photoUrl: row.original.photoUrl,
           });
         }}
