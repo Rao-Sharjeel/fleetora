@@ -412,6 +412,31 @@ class FuelEntryViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
         create=any_of("fuel.create", "gate.fuel", kiosk=True),
     )
 
+    # Edits and deletions are audited but creations are not: a fuel entry is a
+    # money record, and once one exists, changing or removing it is the kind of
+    # thing someone has to be able to account for later. The entry itself is
+    # the record of its own creation.
+    def perform_update(self, serializer):
+        before = FuelEntry.objects.get(pk=serializer.instance.pk)
+        entry = serializer.save()
+        AuditLogEntry.objects.create(
+            user=self.request.user if self.request.user.is_authenticated else None,
+            transaction=f"Fuel entry edited — {entry.vehicle.registration_number}",
+            previous_value=f"{before.litres}L @ {before.rate_per_litre} = {before.total}",
+            new_value=f"{entry.litres}L @ {entry.rate_per_litre} = {entry.total}",
+        )
+
+    def perform_destroy(self, instance):
+        # Any OdometerIssue still open against this entry is CASCADEd away with
+        # it, which is correct — there is no longer a reading to resolve.
+        AuditLogEntry.objects.create(
+            user=self.request.user if self.request.user.is_authenticated else None,
+            transaction=f"Fuel entry deleted — {instance.vehicle.registration_number}",
+            previous_value=f"{instance.litres}L @ {instance.rate_per_litre} = {instance.total}",
+            new_value="Deleted",
+        )
+        instance.delete()
+
 
 class OdometerIssueViewSet(PermissionRulesMixin, viewsets.ReadOnlyModelViewSet):
     """Odometers a guard could not get read, for an admin to resolve.

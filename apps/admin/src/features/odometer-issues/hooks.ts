@@ -18,7 +18,10 @@ export function useResolveOdometerIssue() {
       // anything showing either is now stale.
       queryClient.invalidateQueries({ queryKey: ["vehicles"] });
       queryClient.invalidateQueries({ queryKey: ["trips"] });
-      queryClient.invalidateQueries({ queryKey: ["fuel-entries"] });
+      // ["fuel"], not ["fuel-entries"] — that is the key useFuelEntries uses,
+      // so the old spelling silently matched nothing and the Fuel page kept
+      // showing the null odometer this resolution just filled in.
+      queryClient.invalidateQueries({ queryKey: ["fuel"] });
     },
   });
 }

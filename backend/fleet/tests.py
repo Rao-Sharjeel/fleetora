@@ -1,10 +1,13 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.test import SimpleTestCase
 from django.utils import timezone
 
+from accounts.models import Permission, User
+from audit.models import AuditLogEntry
 from common.testing import TenantAPITestCase
-from fleet.models import Driver, Trip, Vehicle
+from fleet.models import Driver, FuelEntry, OdometerIssue, Trip, Vehicle
 from fleet.services import choose_reading
 
 
@@ -302,4 +305,110 @@ class VehicleForceDeleteTests(TenantAPITestCase):
             expected_fuel_average_kmpl=12, current_odometer=100,
         )
         response = self.as_user(self.admin).delete(f"/api/vehicles/{clean.id}/")
+        self.assertEqual(response.status_code, 204)
+
+
+class FuelEntryEditDeleteTests(TenantAPITestCase):
+    """PATCH/DELETE /api/fuel-entries/<id>/ — the Fuel page's edit and delete,
+    gated on fuel.edit / fuel.delete and audited either way."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin = self.make_user("admin1")
+        self.vehicle = Vehicle.objects.create(
+            registration_number="LEA-5555", company="Head Office", make="Toyota", model="Corolla",
+            year=2021, colour="Silver", fuel_type=Vehicle.FuelType.PETROL,
+            expected_fuel_average_kmpl=12, current_odometer=30000,
+        )
+        self.driver = Driver.objects.create(
+            name="Bilal Khan", company_id_code="EMP-CODE-7", cnic="35201-7654321-2", mobile="0301-7654321",
+            licence_number="LHR-007", licence_category="LTV", licence_expiry="2031-01-01", department="Logistics",
+        )
+        self.entry = FuelEntry.objects.create(
+            vehicle=self.vehicle, driver=self.driver, odometer=30000,
+            fuel_type=Vehicle.FuelType.PETROL, litres=Decimal("40.00"),
+            rate_per_litre=Decimal("250.00"), fuel_station="Shell Main", payment_method="Cash",
+        )
+
+    def staff(self, username, direct=()):
+        user = self.make_user(username, user_type=User.UserType.STAFF)
+        user.direct_permissions.set(Permission.objects.filter(codename__in=direct))
+        return user
+
+    def test_patching_one_field_does_not_require_resending_the_odometer(self):
+        # The serializer's reading-or-photo rule used to fire on every PATCH,
+        # which made correcting a typo'd station impossible on its own.
+        response = self.as_user(self.admin).patch(
+            f"/api/fuel-entries/{self.entry.id}/", {"fuel_station": "Shell Ring Road"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.fuel_station, "Shell Ring Road")
+        self.assertEqual(self.entry.odometer, 30000)
+
+    def test_an_entry_with_no_reading_yet_is_still_editable(self):
+        pending = FuelEntry.objects.create(
+            vehicle=self.vehicle, driver=self.driver, odometer=None,
+            fuel_type=Vehicle.FuelType.PETROL, litres=Decimal("10.00"),
+            rate_per_litre=Decimal("250.00"), fuel_station="Total", payment_method="Cash",
+        )
+        response = self.as_user(self.admin).patch(
+            f"/api/fuel-entries/{pending.id}/", {"payment_method": "Fuel Card"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_edit_recomputes_total_server_side(self):
+        response = self.as_user(self.admin).patch(
+            f"/api/fuel-entries/{self.entry.id}/",
+            {"litres": "50.00", "rate_per_litre": "260.00", "total": "1"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.total, Decimal("13000.00"))
+
+    def test_edit_is_audited_with_the_previous_figures(self):
+        self.as_user(self.admin).patch(
+            f"/api/fuel-entries/{self.entry.id}/", {"litres": "45.00"}, format="json"
+        )
+        log = AuditLogEntry.objects.filter(transaction__startswith="Fuel entry edited").get()
+        self.assertIn("40.00", log.previous_value)
+        self.assertIn("45.00", log.new_value)
+
+    def test_delete_removes_the_entry_and_audits_it(self):
+        response = self.as_user(self.admin).delete(f"/api/fuel-entries/{self.entry.id}/")
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(FuelEntry.objects.filter(pk=self.entry.pk).exists())
+        self.assertTrue(AuditLogEntry.objects.filter(transaction__startswith="Fuel entry deleted").exists())
+
+    def test_delete_cascades_an_open_odometer_issue(self):
+        issue = OdometerIssue.objects.create(
+            vehicle=self.vehicle, fuel_entry=self.entry, stage=OdometerIssue.Stage.FUEL,
+        )
+        self.as_user(self.admin).delete(f"/api/fuel-entries/{self.entry.id}/")
+        self.assertFalse(OdometerIssue.objects.filter(pk=issue.pk).exists())
+
+    def test_staff_needs_fuel_edit_to_patch(self):
+        viewer = self.staff("viewer1", direct=["fuel.view"])
+        response = self.as_user(viewer).patch(
+            f"/api/fuel-entries/{self.entry.id}/", {"litres": "41.00"}, format="json"
+        )
+        self.assertEqual(response.status_code, 403)
+
+        editor = self.staff("editor1", direct=["fuel.view", "fuel.edit"])
+        response = self.as_user(editor).patch(
+            f"/api/fuel-entries/{self.entry.id}/", {"litres": "41.00"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_staff_needs_fuel_delete_to_destroy(self):
+        # fuel.edit alone must not carry delete: correcting a money record and
+        # removing one are separate grants in the catalog.
+        editor = self.staff("editor2", direct=["fuel.view", "fuel.edit"])
+        response = self.as_user(editor).delete(f"/api/fuel-entries/{self.entry.id}/")
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(FuelEntry.objects.filter(pk=self.entry.pk).exists())
+
+        remover = self.staff("remover1", direct=["fuel.view", "fuel.delete"])
+        response = self.as_user(remover).delete(f"/api/fuel-entries/{self.entry.id}/")
         self.assertEqual(response.status_code, 204)

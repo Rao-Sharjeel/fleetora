@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useFuelEntries } from "@/features/fuel/hooks";
+import { toast } from "sonner";
+import { useDeleteFuelEntry, useFuelEntries } from "@/features/fuel/hooks";
 import { useVehicles } from "@/features/vehicles/hooks";
 import { FuelEntryForm } from "@/features/fuel/components/fuel-entry-form";
+import { FuelEntryEditDialog } from "@/features/fuel/components/fuel-entry-edit-dialog";
 import { formatCurrency, formatDateTime, formatKm } from "@/lib/formatters";
 import type { FuelEntry } from "@/types";
 import { useCan } from "@/hooks/use-session";
@@ -17,7 +19,25 @@ export function FuelPage() {
   const { data: entries = [], isLoading } = useFuelEntries();
   const { data: vehicles = [] } = useVehicles();
   const [open, setOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<FuelEntry | null>(null);
+  const deleteFuelEntry = useDeleteFuelEntry();
   const can = useCan();
+
+  async function handleDelete(entry: FuelEntry) {
+    const vehicle = vehicles.find((v) => v.id === entry.vehicleId)?.registrationNumber ?? "this vehicle";
+    if (
+      !window.confirm(
+        `Delete the ${entry.litres}L fuel entry for ${vehicle} (${formatCurrency(entry.total)})? This can't be undone.`,
+      )
+    )
+      return;
+    try {
+      await deleteFuelEntry.mutateAsync(entry.id);
+      toast.success("Fuel entry deleted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete fuel entry.");
+    }
+  }
 
   const totalLitres = entries.reduce((sum, e) => sum + e.litres, 0);
   const totalCost = entries.reduce((sum, e) => sum + e.total, 0);
@@ -35,6 +55,39 @@ export function FuelPage() {
     { accessorKey: "total", header: "Total", cell: ({ getValue }) => formatCurrency(getValue<number>()) },
     { accessorKey: "fuelStation", header: "Station" },
     { accessorKey: "paymentMethod", header: "Payment" },
+    ...(can("fuel.edit") || can("fuel.delete")
+      ? [
+          {
+            id: "actions",
+            meta: { skeleton: "action" },
+            header: "",
+            cell: ({ row }) => (
+              <div className="flex items-center gap-1">
+                {can("fuel.edit") && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Edit fuel entry"
+                    onClick={() => setEditingEntry(row.original)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {can("fuel.delete") && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Delete fuel entry"
+                    onClick={() => handleDelete(row.original)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ),
+          } satisfies ColumnDef<FuelEntry>,
+        ]
+      : []),
   ];
 
   return (
@@ -68,6 +121,12 @@ export function FuelPage() {
       </div>
 
       <DataTable columns={columns} data={entries} searchPlaceholder="Search by station or payment method…" isLoading={isLoading} />
+
+      <FuelEntryEditDialog
+        open={editingEntry !== null}
+        onOpenChange={(next) => !next && setEditingEntry(null)}
+        entry={editingEntry}
+      />
     </div>
   );
 }

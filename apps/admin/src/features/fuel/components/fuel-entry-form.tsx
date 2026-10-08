@@ -11,10 +11,9 @@ import { PhotoCapture } from "@/components/shared/photo-capture";
 import { getVehicleByCode } from "@/services/vehicles.service";
 import { listDrivers } from "@/services/drivers.service";
 import { useCreateFuelEntry } from "@/features/fuel/hooks";
+import { PAYMENT_METHODS } from "@/services/fuel.service";
 import { formatCurrency, formatKm } from "@/lib/formatters";
 import type { Driver, Vehicle } from "@/types";
-
-const PAYMENT_METHODS = ["Cash", "Credit", "Fuel Card", "Company Account", "Driver Paid", "Other"];
 
 export function FuelEntryForm({ onSaved }: { onSaved?: () => void }) {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);

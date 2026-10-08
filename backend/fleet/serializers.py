@@ -567,6 +567,14 @@ class FuelEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "total"]
 
     def validate(self, attrs):
+        # On a PATCH the client sends only the fields it changed, so an absent
+        # odometer means "leave it alone", not "no reading". Enforcing the
+        # reading-or-photo rule there would make editing any other field
+        # (a wrong rate, a typo'd station) impossible without re-sending the
+        # odometer, and would reject edits to entries whose reading is
+        # legitimately still null pending an OdometerIssue.
+        if self.partial and "odometer" not in attrs:
+            return attrs
         if attrs.get("odometer") is None and not attrs.get("odometer_issue_photo"):
             raise serializers.ValidationError(
                 {"odometer": "Provide a reading, or a photo of the odometer to be resolved later."}
