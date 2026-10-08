@@ -102,7 +102,11 @@ export function PermissionPicker({ groups = [], value, onChange, locked = [], is
         </span>
       </div>
 
-      <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto pr-1">
+      {/* No scroll container of its own: the dialog hosting this owns the one
+          scroll area. A second one here meant the groups scrolled inside a
+          45vh window that itself scrolled inside the dialog, and the wheel
+          went to whichever happened to be under the pointer. */}
+      <div className="flex flex-col gap-2">
         {visibleGroups.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">No permissions match “{query}”.</p>
         )}

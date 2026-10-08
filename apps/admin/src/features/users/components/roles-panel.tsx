@@ -131,7 +131,7 @@ export function RolesPanel() {
       <DataTable columns={columns} data={roles} searchPlaceholder="Search roles…" isLoading={isLoading} />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? `Edit ${editing.name}` : "New Role"}</DialogTitle>
             {editing && editing.userCount > 0 && (
@@ -140,7 +140,7 @@ export function RolesPanel() {
               </DialogDescription>
             )}
           </DialogHeader>
-          <div className="flex flex-col gap-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Name" error={nameError}>
                 <Input

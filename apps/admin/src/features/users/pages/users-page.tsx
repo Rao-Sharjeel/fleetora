@@ -217,104 +217,114 @@ function UsersPanel() {
       <DataTable columns={columns} data={users} searchPlaceholder="Search users…" isLoading={isLoading} />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit User" : "Add User"}</DialogTitle>
           </DialogHeader>
-          <form key={editingId ?? "new"} onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Full Name" error={form.formState.errors.name?.message}>
-                <Input {...form.register("name")} placeholder="e.g. Ayesha Khan" />
-              </FormField>
-              <FormField label="Email" error={form.formState.errors.email?.message}>
-                <Input {...form.register("email")} placeholder="e.g. ayesha@company.com" />
-              </FormField>
-              <FormField label={editingId ? "New Password" : "Password"} error={form.formState.errors.password?.message}>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  {...form.register("password")}
-                  placeholder={editingId ? "Leave blank to keep current" : "Set an initial password"}
-                />
-              </FormField>
-              <FormField label="Status">
-                <div className="flex h-9 items-center gap-2">
-                  <Switch
-                    checked={form.watch("active")}
-                    disabled={editingSelf}
-                    onCheckedChange={(v) => form.setValue("active", v === true)}
+          <form
+            key={editingId ?? "new"}
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex min-h-0 flex-1 flex-col gap-5"
+          >
+            {/* min-h-0 is load-bearing on both this and the form: a flex child
+                defaults to min-height:auto, which refuses to shrink below its
+                content, so without it the body never scrolls and the dialog
+                grows past the viewport instead. */}
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Full Name" error={form.formState.errors.name?.message}>
+                  <Input {...form.register("name")} placeholder="e.g. Ayesha Khan" />
+                </FormField>
+                <FormField label="Email" error={form.formState.errors.email?.message}>
+                  <Input {...form.register("email")} placeholder="e.g. ayesha@company.com" />
+                </FormField>
+                <FormField label={editingId ? "New Password" : "Password"} error={form.formState.errors.password?.message}>
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    {...form.register("password")}
+                    placeholder={editingId ? "Leave blank to keep current" : "Set an initial password"}
                   />
-                  <span className="text-sm text-muted-foreground">{form.watch("active") ? "Active" : "Inactive"}</span>
-                </div>
-              </FormField>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">User type</span>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <UserTypeOption
-                  type="admin"
-                  selected={userType === "admin"}
-                  disabled={editingSelf}
-                  onSelect={(t) => form.setValue("userType", t)}
-                  icon={<ShieldCheck className="h-4 w-4" />}
-                  title="Administrator"
-                  description="Full access, including users, roles and kiosk devices."
-                />
-                <UserTypeOption
-                  type="staff"
-                  selected={userType === "staff"}
-                  disabled={editingSelf}
-                  onSelect={(t) => form.setValue("userType", t)}
-                  icon={<UserRound className="h-4 w-4" />}
-                  title="Staff"
-                  description="Access from a role, plus any extra permissions below."
-                />
+                </FormField>
+                <FormField label="Status">
+                  <div className="flex h-9 items-center gap-2">
+                    <Switch
+                      checked={form.watch("active")}
+                      disabled={editingSelf}
+                      onCheckedChange={(v) => form.setValue("active", v === true)}
+                    />
+                    <span className="text-sm text-muted-foreground">{form.watch("active") ? "Active" : "Inactive"}</span>
+                  </div>
+                </FormField>
               </div>
-              {editingSelf && (
-                <p className="text-xs text-muted-foreground">You can't change your own user type or deactivate yourself.</p>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">User type</span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <UserTypeOption
+                    type="admin"
+                    selected={userType === "admin"}
+                    disabled={editingSelf}
+                    onSelect={(t) => form.setValue("userType", t)}
+                    icon={<ShieldCheck className="h-4 w-4" />}
+                    title="Administrator"
+                    description="Full access, including users, roles and kiosk devices."
+                  />
+                  <UserTypeOption
+                    type="staff"
+                    selected={userType === "staff"}
+                    disabled={editingSelf}
+                    onSelect={(t) => form.setValue("userType", t)}
+                    icon={<UserRound className="h-4 w-4" />}
+                    title="Staff"
+                    description="Access from a role, plus any extra permissions below."
+                  />
+                </div>
+                {editingSelf && (
+                  <p className="text-xs text-muted-foreground">You can't change your own user type or deactivate yourself.</p>
+                )}
+              </div>
+
+              {userType === "staff" && (
+                <>
+                  <FormField label="Role">
+                    <Select value={roleId} onValueChange={(v) => form.setValue("roleId", v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_ROLE}>No role — extra permissions only</SelectItem>
+                        {roles.map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            {r.name} ({r.permissions.length})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium">Extra permissions</span>
+                      <span className="text-xs text-muted-foreground">
+                        {rolePermissions.length} from role · {extraCount} extra
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Locked ticks come from the role. Extra permissions only add — to take something away, pick a
+                      different role.
+                    </p>
+                    <PermissionPicker
+                      groups={catalog.data}
+                      isLoading={catalog.isLoading}
+                      value={directPermissions}
+                      locked={rolePermissions}
+                      onChange={(codes: PermissionCode[]) => form.setValue("directPermissions", codes)}
+                    />
+                  </div>
+                </>
               )}
             </div>
-
-            {userType === "staff" && (
-              <>
-                <FormField label="Role">
-                  <Select value={roleId} onValueChange={(v) => form.setValue("roleId", v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_ROLE}>No role — extra permissions only</SelectItem>
-                      {roles.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.name} ({r.permissions.length})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">Extra permissions</span>
-                    <span className="text-xs text-muted-foreground">
-                      {rolePermissions.length} from role · {extraCount} extra
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Locked ticks come from the role. Extra permissions only add — to take something away, pick a
-                    different role.
-                  </p>
-                  <PermissionPicker
-                    groups={catalog.data}
-                    isLoading={catalog.isLoading}
-                    value={directPermissions}
-                    locked={rolePermissions}
-                    onChange={(codes: PermissionCode[]) => form.setValue("directPermissions", codes)}
-                  />
-                </div>
-              </>
-            )}
 
             <DialogFooter>
               <Button type="submit" loading={createUser.isPending || updateUser.isPending} loadingText="Saving…">
