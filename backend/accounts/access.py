@@ -73,9 +73,17 @@ class Authenticated(BasePermission):
         return _user(request) is not None
 
 
-def any_of(*codenames: str, kiosk: bool = False) -> type[BasePermission]:
-    """Allowed when the user holds at least one of `codenames` — or, with
-    kiosk=True, when a paired gate device is calling."""
+def any_of(*codenames: str, kiosk: bool | str = False) -> type[BasePermission]:
+    """Allowed when the user holds at least one of `codenames` — or, when a
+    paired gate device is calling and `kiosk` permits it.
+
+    `kiosk` takes a function name ("exit"/"entry"/"fuel"), and the device must
+    carry it in KioskDevice.apps. Now that one app performs all three, this is
+    the only place the binding is enforced: before, it was checked when a key
+    was claimed and never again, so a paired Exit key could already post fuel
+    entries. `kiosk=True` still means "any paired device", for endpoints that
+    are not specific to one function (looking a vehicle up, say).
+    """
 
     class AnyOf(BasePermission):
         required = codenames
@@ -83,11 +91,12 @@ def any_of(*codenames: str, kiosk: bool = False) -> type[BasePermission]:
 
         def has_permission(self, request, view) -> bool:
             if kiosk and _is_kiosk(request):
-                return True
+                return kiosk is True or kiosk in (request.auth.apps or [])
             user = _user(request)
             return bool(user and (user.is_admin or user.has_any_permission(codenames)))
 
-    AnyOf.__name__ = f"AnyOf({', '.join(codenames)}{', kiosk' if kiosk else ''})"
+    suffix = "" if kiosk is False else f", kiosk={kiosk}"
+    AnyOf.__name__ = f"AnyOf({', '.join(codenames)}{suffix})"
     return AnyOf
 
 

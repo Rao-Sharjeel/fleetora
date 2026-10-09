@@ -15,7 +15,7 @@ export function useKioskDevices() {
 export function useCreateKioskDevice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, app }: { name: string; app: KioskApp }) => createKioskDevice(name, app),
+    mutationFn: ({ name, apps }: { name: string; apps: KioskApp[] }) => createKioskDevice(name, apps),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kiosk-devices"] }),
   });
 }
@@ -23,7 +23,7 @@ export function useCreateKioskDevice() {
 export function useUpdateKioskDevice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<{ name: string; app: KioskApp; active: boolean }> }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<{ name: string; apps: KioskApp[]; active: boolean }> }) =>
       updateKioskDevice(id, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["kiosk-devices"] }),
   });

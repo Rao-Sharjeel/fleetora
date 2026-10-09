@@ -50,7 +50,7 @@ class VehicleViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
         "vehicles",
         by_code=KIOSK_OR_GATE,
         read_odometer=KIOSK_OR_GATE,
-        gate_in=any_of("gate.entry", kiosk=True),
+        gate_in=any_of("gate.entry", kiosk="entry"),
         set_allowed_to_exit=any_of("vehicles.manage_exit_access"),
     )
 
@@ -271,7 +271,7 @@ class TripViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
         partial_update=any_of("trips.edit"),
         destroy=any_of("trips.edit"),
         cancel=any_of("trips.edit"),
-        gate_out=any_of("gate.exit", kiosk=True),
+        gate_out=any_of("gate.exit", kiosk="exit"),
         for_vehicle=KIOSK_OR_GATE,
     )
 
@@ -409,7 +409,7 @@ class FuelEntryViewSet(PermissionRulesMixin, viewsets.ModelViewSet):
     permission_rules = crud_rules(
         "fuel",
         # The Fuel kiosk posts these from the gate; the Fuel page adds them too.
-        create=any_of("fuel.create", "gate.fuel", kiosk=True),
+        create=any_of("fuel.create", "gate.fuel", kiosk="fuel"),
     )
 
     # Edits and deletions are audited but creations are not: a fuel entry is a

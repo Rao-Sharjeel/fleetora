@@ -74,7 +74,9 @@ export async function createAlert(payload: CreateAlertPayload): Promise<void> {
 export interface ClaimKioskDeviceParams {
   apiKey: string;
   installationId: string;
-  app: KioskApp;
+  /** Omitted by the merged app — it pairs for every function its key allows.
+   * The standalone builds send theirs so the server can check it. */
+  app?: KioskApp;
   /** A short description of this browser/device, purely for telling tablets
    * apart on the admin screen — never used to authenticate. */
   deviceLabel: string;
@@ -82,7 +84,7 @@ export interface ClaimKioskDeviceParams {
 
 export interface ClaimKioskDeviceResult {
   name: string;
-  app: KioskApp;
+  apps: KioskApp[];
 }
 
 /** Redeems a device key, unauthenticated (that's the point — this is how a
@@ -96,4 +98,16 @@ export function claimKioskDevice(params: ClaimKioskDeviceParams): Promise<ClaimK
     app: params.app,
     deviceLabel: params.deviceLabel,
   });
+}
+
+export interface KioskDeviceSelf {
+  name: string;
+  apps: KioskApp[];
+}
+
+/** What this paired device is allowed to do, asked on every launch. Covers a
+ * device paired before the key carried a function list, and an admin widening
+ * or narrowing a key after it was claimed — neither needs a re-pair. */
+export function getKioskDeviceSelf(): Promise<KioskDeviceSelf> {
+  return apiGet<KioskDeviceSelf>("/kiosk-devices/me/");
 }

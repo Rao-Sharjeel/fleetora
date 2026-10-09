@@ -41,15 +41,17 @@ export function PairingScreen() {
     setBusy(true);
     setError(null);
     try {
-      await claimKioskDevice({
+      const claimed = await claimKioskDevice({
         apiKey: trimmed,
-        installationId,
+        // Undefined in the merged app, which takes whatever the key allows.
         app: getKioskConfig().app,
+        installationId,
         deviceLabel: describeDevice(),
       });
-      // The claim response confirms this install now owns the key; nothing
-      // further to verify before storing it.
-      pair(trimmed);
+      // The claim response confirms this install now owns the key, and names
+      // the functions it may perform — the launcher renders a button per one,
+      // so it has to be stored alongside the key, not just checked here.
+      pair(trimmed, claimed.apps);
     } catch (err) {
       // The claim endpoint always replies with a specific reason (wrong app,
       // already claimed by another device, key not found) — surface it as-is

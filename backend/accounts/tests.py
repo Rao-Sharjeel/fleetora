@@ -3,11 +3,11 @@ from common.testing import TenantAPITestCase
 
 
 class KioskClaimTests(TenantAPITestCase):
-    """One key, one install, one app — claimed exactly once."""
+    """One key, one install, and the functions that key allows — claimed exactly once."""
 
     def setUp(self):
         super().setUp()
-        self.device = KioskDevice.objects.create(tenant=self.tenant, name="Main Gate", app="exit")
+        self.device = KioskDevice.objects.create(tenant=self.tenant, name="Main Gate", apps=["exit"])
 
     def claim(self, installation_id="install-a", app="exit", api_key=None):
         return self.client.post(
@@ -25,7 +25,7 @@ class KioskClaimTests(TenantAPITestCase):
     def test_new_devices_do_not_collide_on_installation_id(self):
         # An untouched CharField defaults to "", which would break the unique
         # constraint on the second device.
-        second = KioskDevice.objects.create(tenant=self.tenant, name="Pump", app="fuel")
+        second = KioskDevice.objects.create(tenant=self.tenant, name="Pump", apps=["fuel"])
         self.assertIsNone(self.device.installation_id)
         self.assertIsNone(second.installation_id)
 
@@ -48,6 +48,49 @@ class KioskClaimTests(TenantAPITestCase):
 
     def test_wrong_app_is_refused(self):
         self.assertEqual(self.claim(app="fuel").status_code, 403)
+
+    def test_merged_app_claims_without_naming_a_function(self):
+        # The one-app launcher pairs once and takes whatever the key allows,
+        # so it sends no `app` at all. The response tells it which buttons to
+        # offer.
+        response = self.client.post(
+            "/api/kiosk-devices/claim/",
+            {"apiKey": self.device.api_key, "installationId": "install-merged"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["apps"], ["exit"])
+
+    def test_a_key_can_allow_several_functions(self):
+        everything = KioskDevice.objects.create(
+            tenant=self.tenant, name="Guard Phone", apps=["exit", "entry", "fuel"]
+        )
+        response = self.client.post(
+            "/api/kiosk-devices/claim/",
+            {"apiKey": everything.api_key, "installationId": "install-all"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertCountEqual(response.data["apps"], ["exit", "entry", "fuel"])
+        # A single-function build naming one of them still pairs.
+        self.assertEqual(
+            self.client.post(
+                "/api/kiosk-devices/claim/",
+                {"apiKey": everything.api_key, "installationId": "install-all", "app": "fuel"},
+                format="json",
+            ).status_code,
+            200,
+        )
+
+    def test_a_key_allowing_nothing_cannot_be_claimed(self):
+        # What every key minted before binding existed looks like.
+        stranded = KioskDevice.objects.create(tenant=self.tenant, name="Legacy", apps=[])
+        response = self.client.post(
+            "/api/kiosk-devices/claim/",
+            {"apiKey": stranded.api_key, "installationId": "install-x"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_unknown_key_is_404(self):
         self.assertEqual(self.claim(api_key="0" * 64).status_code, 404)
@@ -302,3 +345,42 @@ class RoleAndUserManagementTests(RbacTestCase):
         self.assertEqual(response.data["user_type"], "staff")
         self.assertEqual(response.data["role_name"], "Gate Guard")
         self.assertEqual(response.data["permissions"], ["gate.entry", "gate.exit", "gate.fuel"])
+
+
+class KioskDeviceSelfTests(TenantAPITestCase):
+    """GET /api/kiosk-devices/me/ — what the calling device may do.
+
+    A phone paired against one of the old single-function builds has a key
+    stored and no function list, so without this it would reach the merged
+    app's launcher with nothing to offer.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.device = KioskDevice.objects.create(
+            tenant=self.tenant, name="Guard Phone", apps=["exit", "fuel"]
+        )
+        self.device.installation_id = "install-self"
+        self.device.save(update_fields=["installation_id"])
+
+    def get_self(self, **headers):
+        return self.client.get("/api/kiosk-devices/me/", **headers)
+
+    def test_a_paired_device_learns_its_functions(self):
+        response = self.get_self(
+            HTTP_X_KIOSK_API_KEY=self.device.api_key,
+            HTTP_X_KIOSK_INSTALL_ID="install-self",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertCountEqual(response.data["apps"], ["exit", "fuel"])
+        self.assertEqual(response.data["name"], "Guard Phone")
+
+    def test_another_device_is_refused(self):
+        response = self.get_self(
+            HTTP_X_KIOSK_API_KEY=self.device.api_key,
+            HTTP_X_KIOSK_INSTALL_ID="some-other-install",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_no_key_is_refused(self):
+        self.assertEqual(self.get_self().status_code, 401)

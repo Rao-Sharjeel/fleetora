@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from accounts.models import Permission, User
+from accounts.models import KioskDevice, Permission, User
 from audit.models import AuditLogEntry
 from common.testing import TenantAPITestCase
 from fleet.models import Driver, FuelEntry, OdometerIssue, Trip, Vehicle
@@ -412,3 +412,55 @@ class FuelEntryEditDeleteTests(TenantAPITestCase):
         remover = self.staff("remover1", direct=["fuel.view", "fuel.delete"])
         response = self.as_user(remover).delete(f"/api/fuel-entries/{self.entry.id}/")
         self.assertEqual(response.status_code, 204)
+
+
+class KioskCapabilityTests(TenantAPITestCase):
+    """A paired device may only call the gate functions its key names.
+
+    Before KioskDevice.apps this was checked when the key was claimed and never
+    again, so an Exit key, once paired, could post fuel entries just as well.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.vehicle = Vehicle.objects.create(
+            registration_number="LEA-7777", company="Head Office", make="Suzuki", model="Bolan",
+            year=2020, colour="White", fuel_type=Vehicle.FuelType.PETROL,
+            expected_fuel_average_kmpl=11, current_odometer=12000,
+        )
+        self.driver = Driver.objects.create(
+            name="Imran Shah", company_id_code="EMP-CODE-3", cnic="35201-1111111-1", mobile="0302-1111111",
+            licence_number="LHR-003", licence_category="LTV", licence_expiry="2032-01-01", department="Ops",
+        )
+
+    def device(self, apps, installation_id):
+        d = KioskDevice.objects.create(tenant=self.tenant, name=f"Phone {installation_id}", apps=apps)
+        d.installation_id = installation_id
+        d.save(update_fields=["installation_id"])
+        return d
+
+    def post_fuel(self, device):
+        return self.client.post(
+            "/api/fuel-entries/",
+            {
+                "vehicleId": str(self.vehicle.id),
+                "driverId": str(self.driver.id),
+                "odometer": 12100,
+                "fuelType": "petrol",
+                "litres": "20.00",
+                "ratePerLitre": "250.00",
+                "fuelStation": "Shell",
+                "paymentMethod": "Cash",
+            },
+            format="json",
+            HTTP_X_KIOSK_API_KEY=device.api_key,
+            HTTP_X_KIOSK_INSTALL_ID=device.installation_id,
+        )
+
+    def test_an_exit_only_key_cannot_file_a_fuel_entry(self):
+        response = self.post_fuel(self.device(["exit"], "install-exit-only"))
+        self.assertEqual(response.status_code, 403, response.data)
+
+    def test_a_key_allowing_fuel_can(self):
+        response = self.post_fuel(self.device(["exit", "fuel"], "install-exit-fuel"))
+        self.assertEqual(response.status_code, 201, response.data)

@@ -5,7 +5,9 @@ export type KioskApp = "exit" | "entry" | "fuel";
 export interface KioskDevice {
   id: string;
   name: string;
-  app: KioskApp | "";
+  /** Which gate functions this key may perform. One key can now allow
+   * several, because the three gate apps are one app with a launcher. */
+  apps: KioskApp[];
   active: boolean;
   /** True once some install has claimed this key. A key can be claimed
    * exactly once — see backend/accounts/authentication.py. */
@@ -29,13 +31,13 @@ export async function listKioskDevices(): Promise<KioskDevice[]> {
   return apiList<KioskDevice>("/kiosk-devices/");
 }
 
-export async function createKioskDevice(name: string, app: KioskApp): Promise<KioskDeviceWithKey> {
-  return apiPost<KioskDeviceWithKey>("/kiosk-devices/", { name, app });
+export async function createKioskDevice(name: string, apps: KioskApp[]): Promise<KioskDeviceWithKey> {
+  return apiPost<KioskDeviceWithKey>("/kiosk-devices/", { name, apps });
 }
 
 export async function updateKioskDevice(
   id: string,
-  patch: Partial<{ name: string; app: KioskApp; active: boolean }>,
+  patch: Partial<{ name: string; apps: KioskApp[]; active: boolean }>,
 ): Promise<KioskDevice> {
   return apiPatch<KioskDevice>(`/kiosk-devices/${id}/`, patch);
 }

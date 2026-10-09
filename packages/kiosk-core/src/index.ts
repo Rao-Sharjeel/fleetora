@@ -1,4 +1,5 @@
 export { configureKiosk, getKioskConfig, ODOMETER_ATTEMPT_LIMIT } from "./config";
+export type { KioskApp } from "./config";
 
 export { KioskShell, PrimaryButton, SecondaryButton } from "./components/kiosk-shell";
 export { CameraView } from "./components/camera-view";
@@ -30,6 +31,7 @@ export {
   createFuelEntry,
   createAlert,
   readOdometerReading,
+  getKioskDeviceSelf,
 } from "./lib/kiosk-api";
 
 export { useDeviceSession } from "./state/device-session";

@@ -211,7 +211,7 @@ class KioskDeviceSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "app",
+            "apps",
             "active",
             "claimed",
             "claimed_at",
@@ -230,9 +230,9 @@ class KioskDeviceCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = KioskDevice
-        fields = ["id", "name", "app", "active", "api_key", "created_at"]
+        fields = ["id", "name", "apps", "active", "api_key", "created_at"]
         read_only_fields = ["id", "api_key", "created_at"]
-        extra_kwargs = {"app": {"required": True}}
+        extra_kwargs = {"apps": {"required": True, "allow_empty": False}}
 
 
 class KioskClaimSerializer(serializers.Serializer):
@@ -245,5 +245,9 @@ class KioskClaimSerializer(serializers.Serializer):
 
     api_key = serializers.CharField()
     installation_id = serializers.CharField(max_length=64)
-    app = serializers.ChoiceField(choices=KioskDevice.App.choices)
+    # Optional: the merged kiosk app pairs once for every function its key
+    # allows and sends nothing here. The separate Entry/Fuel builds still in
+    # the field send the one app they are, and that is still checked against
+    # the key — so they keep working until they're retired.
+    app = serializers.ChoiceField(choices=KioskDevice.App.choices, required=False)
     device_label = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")

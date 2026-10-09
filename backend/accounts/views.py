@@ -4,6 +4,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import NotAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -174,10 +175,21 @@ class KioskClaimView(APIView):
             except KioskDevice.DoesNotExist:
                 return Response({"detail": "That key isn't valid. Check it with an administrator."}, status=404)
 
-            if device.app != data["app"]:
-                issued_for = device.get_app_display() if device.app else "a different app"
+            if not device.apps:
+                # Keys minted before any binding existed, and keys an admin
+                # saved with nothing ticked. Nothing can be done with one.
                 return Response(
-                    {"detail": f"This key was issued for {issued_for}, not this app."},
+                    {"detail": "This key isn't allowed to do anything yet. Ask an administrator to reissue it."},
+                    status=403,
+                )
+
+            # A single-function build (the standalone Entry/Fuel apps) names
+            # itself and must be one of the functions this key allows. The
+            # merged app sends nothing and takes whatever the key permits.
+            if data.get("app") and data["app"] not in device.apps:
+                allowed = ", ".join(dict(KioskDevice.App.choices)[a] for a in device.apps)
+                return Response(
+                    {"detail": f"This key is for {allowed}, not this app."},
                     status=403,
                 )
 
@@ -200,4 +212,28 @@ class KioskClaimView(APIView):
 
         # Re-claiming from the same install is a no-op success, so a kiosk that
         # retries a dropped pairing request doesn't lock itself out.
-        return Response({"name": device.name, "app": device.app})
+        return Response({"name": device.name, "apps": device.apps})
+
+
+class KioskDeviceSelfView(APIView):
+    """What the calling device is allowed to do — `GET /api/kiosk-devices/me/`.
+
+    The merged gate app learns its functions from the claim response, but a
+    phone that paired against one of the old single-function builds has a key
+    stored and no function list, and an admin can widen or narrow a key long
+    after it was claimed. Rather than make either case need a re-pair, the app
+    asks on every launch and falls back to what it already had when offline.
+    """
+
+    # Deliberately leaves authentication_classes at the project default rather
+    # than narrowing it to KioskDeviceAuthentication. DRF takes the 401
+    # WWW-Authenticate header from the *first* authenticator, and the kiosk one
+    # supplies none — so pinning it here would turn every refusal into a 403
+    # and make this the only kiosk endpoint that answers differently.
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        device = request.auth
+        if not isinstance(device, KioskDevice):
+            raise NotAuthenticated("This endpoint is for a paired kiosk device.")
+        return Response({"name": device.name, "apps": device.apps})

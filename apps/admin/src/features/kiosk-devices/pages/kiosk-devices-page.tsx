@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   useCreateKioskDevice,
   useDeleteKioskDevice,
@@ -40,7 +40,9 @@ const APPS: { value: KioskApp; label: string }[] = [
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
-  app: z.enum(["exit", "entry", "fuel"]),
+  // At least one: a key allowing nothing can't be claimed at all (the claim
+  // endpoint refuses it), which is what every pre-binding key looks like.
+  apps: z.array(z.enum(["exit", "entry", "fuel"])).min(1, "Pick at least one"),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -51,12 +53,12 @@ export function KioskDevicesPage() {
   const reissueDevice = useReissueKioskDevice();
   const deleteDevice = useDeleteKioskDevice();
   const [open, setOpen] = useState(false);
-  const [issuedKey, setIssuedKey] = useState<{ name: string; app: KioskApp | ""; apiKey: string } | null>(null);
+  const [issuedKey, setIssuedKey] = useState<{ name: string; apps: KioskApp[]; apiKey: string } | null>(null);
 
-  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { name: "", app: "exit" } });
+  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { name: "", apps: ["exit"] } });
 
   function openAdd() {
-    form.reset({ name: "", app: "exit" });
+    form.reset({ name: "", apps: ["exit"] });
     setOpen(true);
   }
 
@@ -64,7 +66,7 @@ export function KioskDevicesPage() {
     try {
       const device = await createDevice.mutateAsync(values);
       setOpen(false);
-      setIssuedKey({ name: device.name, app: device.app, apiKey: device.apiKey });
+      setIssuedKey({ name: device.name, apps: device.apps, apiKey: device.apiKey });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add device.");
     }
@@ -89,7 +91,7 @@ export function KioskDevicesPage() {
     }
     try {
       const device2 = await reissueDevice.mutateAsync(device.id);
-      setIssuedKey({ name: device2.name, app: device2.app, apiKey: device2.apiKey });
+      setIssuedKey({ name: device2.name, apps: device2.apps, apiKey: device2.apiKey });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to reissue key.");
     }
@@ -107,12 +109,21 @@ export function KioskDevicesPage() {
   const columns: ColumnDef<KioskDevice>[] = [
     { accessorKey: "name", header: "Name" },
     {
-      accessorKey: "app",
-      header: "App",
+      accessorKey: "apps",
+      header: "Allowed",
       meta: { skeleton: "badge" },
       cell: ({ getValue }) => {
-        const app = getValue<KioskApp | "">();
-        return app ? <Badge variant="outline" dot={false}>{APPS.find((a) => a.value === app)?.label}</Badge> : "—";
+        const apps = getValue<KioskApp[]>() ?? [];
+        if (apps.length === 0) return "—";
+        return (
+          <span className="flex flex-wrap gap-1">
+            {apps.map((a) => (
+              <Badge key={a} variant="outline" dot={false}>
+                {APPS.find((x) => x.value === a)?.label}
+              </Badge>
+            ))}
+          </span>
+        );
       },
     },
     {
@@ -183,7 +194,7 @@ export function KioskDevicesPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Kiosk Devices"
-        description="Devices authorized to use the Entry, Exit and Fuel apps. Each key is scoped to one app and is claimed by exactly one physical device — pasting it into a second device or app is refused."
+        description="Phones and tablets authorized to work the gate. A key names the functions it may perform and is claimed by exactly one physical device — pasting it into a second device is refused."
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -199,19 +210,30 @@ export function KioskDevicesPage() {
                 <FormField label="Device Name" error={form.formState.errors.name?.message}>
                   <Input {...form.register("name")} placeholder="e.g. Main Gate — Exit Tablet" />
                 </FormField>
-                <FormField label="App" error={form.formState.errors.app?.message}>
-                  <Select value={form.watch("app")} onValueChange={(v) => form.setValue("app", v as KioskApp)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select app" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {APPS.map((a) => (
-                        <SelectItem key={a.value} value={a.value}>
-                          {a.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FormField label="Allowed functions" error={form.formState.errors.apps?.message}>
+                  <div className="flex flex-col gap-2">
+                    {APPS.map((a) => {
+                      const selected = form.watch("apps") ?? [];
+                      const on = selected.includes(a.value as KioskApp);
+                      return (
+                        <label key={a.value} className="flex cursor-pointer items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={on}
+                            onCheckedChange={(checked) =>
+                              form.setValue(
+                                "apps",
+                                checked === true
+                                  ? [...selected, a.value as KioskApp]
+                                  : selected.filter((x) => x !== a.value),
+                                { shouldValidate: true },
+                              )
+                            }
+                          />
+                          <span>{a.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </FormField>
                 <DialogFooter>
                   <Button type="submit" loading={createDevice.isPending} loadingText="Creating…">
@@ -235,7 +257,7 @@ function IssuedKeyDialog({
   issued,
   onClose,
 }: {
-  issued: { name: string; app: KioskApp | ""; apiKey: string } | null;
+  issued: { name: string; apps: KioskApp[]; apiKey: string } | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -262,7 +284,9 @@ function IssuedKeyDialog({
     toast.success("Key copied to clipboard.");
   }
 
-  const appLabel = issued?.app ? APPS.find((a) => a.value === issued.app)?.label : null;
+  const appLabel = issued?.apps?.length
+    ? issued.apps.map((a) => APPS.find((x) => x.value === a)?.label).join(" · ")
+    : null;
 
   return (
     <Dialog

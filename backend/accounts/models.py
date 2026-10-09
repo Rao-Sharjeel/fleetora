@@ -2,6 +2,7 @@ import secrets
 import uuid
 
 from django.contrib.auth.models import AbstractUser
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
 
@@ -139,11 +140,16 @@ class KioskDevice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="kiosk_devices")
     name = models.CharField(max_length=80)
-    # Which gate app this key is for. Fixed when the key is minted, so an Exit
-    # key cannot be redeemed by the Fuel app even on the same tablet. Blank only
-    # for keys issued before binding existed; those can no longer authenticate
-    # and have to be reissued.
-    app = models.CharField(max_length=6, choices=App.choices, blank=True, default="")
+    # Which gate functions this key may perform. A list, not one value, because
+    # the three gate apps are now one app with a launcher: a guard's phone pairs
+    # once and the launcher offers only the functions named here. Fixed when the
+    # key is minted. Empty means the key can do nothing and has to be reissued —
+    # which is also what keys predating binding look like.
+    apps = ArrayField(
+        models.CharField(max_length=6, choices=App.choices),
+        default=list,
+        blank=True,
+    )
     api_key = models.CharField(max_length=64, unique=True, editable=False, default=generate_kiosk_key)
     active = models.BooleanField(default=True)
 

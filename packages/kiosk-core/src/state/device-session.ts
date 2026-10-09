@@ -1,14 +1,19 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { KioskApp } from "../config";
 
 interface DeviceSessionState {
   apiKey: string | null;
+  /** Which gate functions this key allows, as the claim response reported them.
+   * The launcher renders a button per entry. Empty until paired. */
+  apps: KioskApp[];
   /** Generated once on this install and sent with every request. The server
    * binds a key to the first installation id that claims it and refuses any
    * other — this is what makes a key usable on exactly one device instead of
    * being a bearer secret anyone who reads it off a screen can reuse. */
   installationId: string;
-  pair: (apiKey: string) => void;
+  pair: (apiKey: string, apps: KioskApp[]) => void;
+  setApps: (apps: KioskApp[]) => void;
   unpair: () => void;
 }
 
@@ -34,9 +39,11 @@ export const useDeviceSession = create<DeviceSessionState>()(
   persist(
     (set) => ({
       apiKey: null,
+      apps: [],
       installationId: newInstallationId(),
-      pair: (apiKey) => set({ apiKey }),
-      unpair: () => set({ apiKey: null }),
+      pair: (apiKey, apps) => set({ apiKey, apps }),
+      setApps: (apps) => set({ apps }),
+      unpair: () => set({ apiKey: null, apps: [] }),
     }),
     { name: "kiosk-device" },
   ),
