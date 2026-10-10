@@ -580,7 +580,22 @@ export async function readOdometerOnDevice(
         ),
       );
     }
-    const boxes = rankBoxes(mergeBoxes(detected)).slice(0, MAX_BOXES);
+    // The whole frame, always tried first and never subject to MAX_BOXES.
+    //
+    // The detector finds text lines *within* a scene, and falls apart when the
+    // text is the scene: on captures cropped tight to the digits it returns
+    // zero boxes, or splits the run in two, and a reading that the recogniser
+    // gets at 1.00 confidence is thrown away. Measured on the sample set
+    // (tools/odometer-eval), digit-filling crops went 2/5 -> 4/5 with this,
+    // while the full-dashboard photos stayed at 7/8 and nothing read wrong —
+    // on a wide scene the whole-frame pass simply finds no valid digit run and
+    // contributes nothing.
+    //
+    // It is first because it is also the fast path: a well-aimed capture now
+    // resolves on one box in the cheapest attempt instead of working through
+    // a dashboard's worth of detected regions.
+    const wholeFrame: TextBox = { x1: 0, y1: 0, x2: source.width, y2: source.height, score: 1 };
+    const boxes = [wholeFrame, ...rankBoxes(mergeBoxes(detected)).slice(0, MAX_BOXES)];
 
     allCandidates = [];
     for (const box of boxes) {
@@ -588,7 +603,13 @@ export async function readOdometerOnDevice(
       // could already outrun the budget on its own, and the whole point of the
       // deadline is that the operator gets an answer either way.
       if (Date.now() - startedAt > DEADLINE_MS) break;
-      allCandidates.push(...(await readBox(rec, source, box, attempt.withContrast, options)));
+      // Contrast variants are forced for the whole-frame box. Its paddings all
+      // clamp to the same rectangle, so without them its "variants" are three
+      // identical crops and the agreement check — the thing that catches a
+      // confident wrong read — passes vacuously. This matches what was
+      // measured in tools/odometer-eval, where every box gets a contrast pass.
+      const withContrast = attempt.withContrast || box === wholeFrame;
+      allCandidates.push(...(await readBox(rec, source, box, withContrast, options)));
     }
     seenCandidates.push(...allCandidates);
 
