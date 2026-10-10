@@ -205,6 +205,10 @@ REST_FRAMEWORK = {
         "djangorestframework_camel_case.render.CamelCaseJSONRenderer",
         "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
     ],
+    # Only the kiosk release endpoint is throttled. It is the one place an
+    # unauthenticated-ish caller (a device, not a user) guesses at a secret,
+    # and the password is short enough to be typed on a phone at a gate.
+    "DEFAULT_THROTTLE_RATES": {"kiosk-release": "10/hour"},
     "DEFAULT_PARSER_CLASSES": [
         "djangorestframework_camel_case.parser.CamelCaseJSONParser",
     ],

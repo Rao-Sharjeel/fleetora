@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/shared/form-field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSettings, useUpdateMaintenanceThresholds } from "@/features/settings/hooks";
+import {
+  useSettings,
+  useUpdateKioskReleasePassword,
+  useUpdateMaintenanceThresholds,
+} from "@/features/settings/hooks";
 import { useMasterCollection } from "@/features/master-data/hooks";
 import { useCan } from "@/hooks/use-session";
 
@@ -97,6 +101,7 @@ export function SettingsPage() {
       </Card>
 
       <MaintenanceThresholdsCard />
+      <KioskDisconnectCard />
     </div>
   );
 }
@@ -202,5 +207,115 @@ function ThresholdRow({ label, value }: { label: string; value: string }) {
       <p className="font-medium">{label}</p>
       <p className="text-muted-foreground">{value}</p>
     </div>
+  );
+}
+
+/**
+ * The password a kiosk must present to unpair itself from this fleet.
+ *
+ * Phones move — reassigned, replaced, a guard leaves — and without this the
+ * only way to free a device key is an administrator at this console, while
+ * the phone goes on recording as whatever device it was issued as. The
+ * password is what stops the guard holding it doing the same thing casually.
+ *
+ * Stored hashed and never served back, so this can only report whether one
+ * exists, never show it. Leaving it unset means no device can disconnect
+ * itself at all — the safe default, rather than one that reads as "no
+ * password needed".
+ */
+function KioskDisconnectCard() {
+  const { data: settings, isLoading } = useSettings();
+  const updatePassword = useUpdateKioskReleasePassword();
+  const canEdit = useCan()("settings.edit");
+  const [password, setPassword] = useState("");
+
+  const isSet = settings?.kioskReleasePasswordSet ?? false;
+
+  async function handleSave() {
+    if (password.length < 4) {
+      toast.error("Use at least 4 characters.");
+      return;
+    }
+    try {
+      await updatePassword.mutateAsync(password);
+      setPassword("");
+      toast.success(isSet ? "Disconnect password changed." : "Disconnect password set.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save the password.");
+    }
+  }
+
+  async function handleClear() {
+    if (!window.confirm("Remove the password? No kiosk will be able to disconnect itself until a new one is set.")) {
+      return;
+    }
+    try {
+      await updatePassword.mutateAsync("");
+      setPassword("");
+      toast.success("Disconnect password removed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove the password.");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Kiosk Disconnect Password</CardTitle>
+        <CardDescription>
+          Required on a gate device before it can unpair itself. Its key is not revoked — the same key can be paired
+          again afterwards, on that phone or another.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {isLoading ? (
+          <div aria-busy className="flex flex-col gap-4">
+            <span className="sr-only" role="status">
+              Loading settings…
+            </span>
+            <Skeleton className="h-4 w-56" />
+            <Skeleton className="h-9 w-full sm:max-w-sm" />
+            <Skeleton className="h-9 w-36" />
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {isSet
+                ? "A password is set. Enter a new one to replace it."
+                : "No password is set, so no kiosk can disconnect itself."}
+            </p>
+            <div className="sm:max-w-sm">
+              <FormField label={isSet ? "New password" : "Password"}>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  disabled={!canEdit}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 4 characters"
+                />
+              </FormField>
+            </div>
+            {canEdit && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={handleSave}
+                  disabled={password.length < 4}
+                  loading={updatePassword.isPending}
+                  loadingText="Saving…"
+                >
+                  {isSet ? "Change Password" : "Set Password"}
+                </Button>
+                {isSet && (
+                  <Button variant="outline" onClick={handleClear} disabled={updatePassword.isPending}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -1,4 +1,8 @@
+from rest_framework.test import APIClient
+
 from accounts.models import KioskDevice
+from audit.models import AuditLogEntry
+from common.models import FleetSettings
 from common.testing import TenantAPITestCase
 
 
@@ -384,3 +388,81 @@ class KioskDeviceSelfTests(TenantAPITestCase):
 
     def test_no_key_is_refused(self):
         self.assertEqual(self.get_self().status_code, 401)
+
+
+class KioskReleaseTests(TenantAPITestCase):
+    """POST /api/kiosk-devices/release/ — a paired kiosk unpairing itself."""
+
+    def setUp(self):
+        super().setUp()
+        self.device = KioskDevice.objects.create(tenant=self.tenant, name="Gate Phone", apps=["exit"])
+        self.device.installation_id = "install-r"
+        self.device.save(update_fields=["installation_id"])
+        self.settings_row = FleetSettings.load()
+        self.settings_row.set_kiosk_release_password("let-me-out")
+        self.settings_row.save(update_fields=["kiosk_release_password"])
+
+    def release(self, password, installation_id="install-r"):
+        # A separate client: force_authenticate() in as_user() pins request.auth
+        # on the shared one, and the device headers would then be ignored.
+        device_client = APIClient(HTTP_HOST=self.get_test_tenant_domain())
+        return device_client.post(
+            "/api/kiosk-devices/release/",
+            {"password": password},
+            format="json",
+            HTTP_X_KIOSK_API_KEY=self.device.api_key,
+            HTTP_X_KIOSK_INSTALL_ID=installation_id,
+        )
+
+    def test_correct_password_frees_the_key_to_be_paired_again(self):
+        response = self.release("let-me-out")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.device.refresh_from_db()
+        self.assertIsNone(self.device.installation_id)
+        self.assertIsNone(self.device.claimed_at)
+        # The point of releasing rather than revoking: the same key works again.
+        claim = self.client.post(
+            "/api/kiosk-devices/claim/",
+            {"apiKey": self.device.api_key, "installationId": "a-different-phone"},
+            format="json",
+        )
+        self.assertEqual(claim.status_code, 200, claim.data)
+
+    def test_wrong_password_changes_nothing(self):
+        self.assertEqual(self.release("guess").status_code, 403)
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.installation_id, "install-r")
+
+    def test_release_is_audited(self):
+        self.release("let-me-out")
+        self.assertTrue(AuditLogEntry.objects.filter(transaction__startswith="Kiosk device disconnected").exists())
+
+    def test_unset_password_refuses_rather_than_allowing_anything(self):
+        self.settings_row.set_kiosk_release_password("")
+        self.settings_row.save(update_fields=["kiosk_release_password"])
+        self.assertEqual(self.release("").status_code, 409)
+        self.assertEqual(self.release("anything").status_code, 409)
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.installation_id, "install-r")
+
+    def test_another_device_cannot_release_this_one(self):
+        self.assertEqual(self.release("let-me-out", installation_id="someone-else").status_code, 401)
+        self.device.refresh_from_db()
+        self.assertEqual(self.device.installation_id, "install-r")
+
+    def test_the_hash_is_never_served_and_only_its_existence_is(self):
+        response = self.as_user(self.make_user("admin-s")).get("/api/settings/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("kiosk_release_password", response.data)
+        self.assertIs(response.data["kiosk_release_password_set"], True)
+
+    def test_an_admin_can_set_the_password_through_settings(self):
+        client = self.as_user(self.make_user("admin-t"))
+        response = client.patch("/api/settings/", {"kioskReleasePassword": "new-secret"}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(FleetSettings.load().check_kiosk_release_password("new-secret"))
+        self.assertEqual(self.release("new-secret").status_code, 200)
+
+    def test_a_too_short_password_is_rejected(self):
+        client = self.as_user(self.make_user("admin-u"))
+        self.assertEqual(client.patch("/api/settings/", {"kioskReleasePassword": "ab"}, format="json").status_code, 400)

@@ -1,5 +1,13 @@
-import { LogOut, LogIn, Fuel } from "lucide-react";
-import { BuildStamp, UpdateButton, configureKiosk, useDeviceSession, type KioskApp } from "@fleetora/kiosk-core";
+import { useState } from "react";
+import { LogOut, LogIn, Fuel, Unplug } from "lucide-react";
+import {
+  BuildStamp,
+  DisconnectDialog,
+  UpdateButton,
+  configureKiosk,
+  useDeviceSession,
+  type KioskApp,
+} from "@fleetora/kiosk-core";
 import { useKioskMode } from "@/state/kiosk-mode";
 import { useExitSession } from "@/flows/exit/exit-session";
 import { useEntrySession } from "@/flows/entry/entry-session";
@@ -65,6 +73,7 @@ const FLOWS: Flow[] = [
 export function LauncherPage() {
   const allowed = useDeviceSession((s) => s.apps);
   const setMode = useKioskMode((s) => s.setMode);
+  const [disconnecting, setDisconnecting] = useState(false);
   const available = FLOWS.filter((f) => allowed.includes(f.app));
 
   function choose(flow: Flow) {
@@ -128,8 +137,20 @@ export function LauncherPage() {
         <div className="flex items-center gap-3">
           <BuildStamp />
           <UpdateButton />
+          {/* Deliberately plain and quiet: this is an occasional administrative
+              act, not something a guard should be drawn towards between
+              vehicles. The password is what actually guards it. */}
+          <button
+            type="button"
+            onClick={() => setDisconnecting(true)}
+            className="flex items-center gap-1.5 rounded-full border border-kiosk-border/60 px-3 py-1 text-[11px] text-kiosk-muted active:scale-95"
+          >
+            <Unplug className="h-3 w-3" /> Disconnect
+          </button>
         </div>
       </div>
+
+      {disconnecting && <DisconnectDialog onClose={() => setDisconnecting(false)} />}
     </div>
   );
 }

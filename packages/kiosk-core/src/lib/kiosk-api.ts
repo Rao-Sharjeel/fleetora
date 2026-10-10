@@ -111,3 +111,15 @@ export interface KioskDeviceSelf {
 export function getKioskDeviceSelf(): Promise<KioskDeviceSelf> {
   return apiGet<KioskDeviceSelf>("/kiosk-devices/me/");
 }
+
+/**
+ * Unpairs this device from its fleet, given the password an administrator set.
+ *
+ * The key itself survives — the server only clears the install it was bound
+ * to — so the same key pairs again afterwards, here or on another phone. A
+ * 409 means no password has been configured and nothing can be released until
+ * one is; a 403 means the password was wrong.
+ */
+export function releaseKioskDevice(password: string): Promise<{ detail: string }> {
+  return apiPost<{ detail: string }>("/kiosk-devices/release/", { password });
+}

@@ -6,6 +6,7 @@ from accounts.views import (
     KioskClaimView,
     KioskDeviceSelfView,
     KioskDeviceViewSet,
+    KioskReleaseView,
     LoginView,
     MeView,
     PermissionCatalogView,
@@ -25,6 +26,7 @@ urlpatterns = [
     # Also before the router, and for the same reason: the caller is a device,
     # not an admin.
     path("kiosk-devices/me/", KioskDeviceSelfView.as_view(), name="kiosk-self"),
+    path("kiosk-devices/release/", KioskReleaseView.as_view(), name="kiosk-release"),
     path("auth/login/", LoginView.as_view(), name="auth-login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
     path("auth/me/", MeView.as_view(), name="auth-me"),

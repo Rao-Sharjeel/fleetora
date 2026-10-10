@@ -5,12 +5,15 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import NotAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from audit.models import AuditLogEntry
 from accounts.models import KioskDevice, Role, User, generate_kiosk_key
+from audit.models import AuditLogEntry
+from common.models import FleetSettings
 from accounts.access import AdminOnly
 from accounts.permissions_catalog import PERMISSION_GROUPS
 from accounts.serializers import (
@@ -18,6 +21,7 @@ from accounts.serializers import (
     KioskClaimSerializer,
     KioskDeviceCreateSerializer,
     KioskDeviceSerializer,
+    KioskReleaseSerializer,
     RoleSerializer,
     UserManageSerializer,
     UserSerializer,
@@ -237,3 +241,56 @@ class KioskDeviceSelfView(APIView):
         if not isinstance(device, KioskDevice):
             raise NotAuthenticated("This endpoint is for a paired kiosk device.")
         return Response({"name": device.name, "apps": device.apps})
+
+
+class KioskReleaseView(APIView):
+    """POST /api/kiosk-devices/release/ — a paired kiosk unpairing itself.
+
+    Authenticated as the device, so a kiosk can only ever release *itself*,
+    and gated on a password an administrator sets in Settings. The device's
+    key survives: installation_id and claimed_at are cleared, so the same key
+    can be paired again, by this phone or another one. That is what makes this
+    a logout rather than a destruction — a key that could never be re-claimed
+    would mean reissuing one every time a phone changed hands.
+
+    With no password configured this refuses outright. An unset password must
+    not read as "no password needed", or every device would be one tap from
+    unpairing the day the feature ships.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_scope = "kiosk-release"
+    throttle_classes = [ScopedRateThrottle]
+
+    def post(self, request):
+        device = request.auth
+        if not isinstance(device, KioskDevice):
+            raise NotAuthenticated("This endpoint is for a paired kiosk device.")
+
+        # Checked before the body is validated, so a device whose fleet has no
+        # password configured always gets told that — rather than a generic
+        # "this field is required" for a password that could not have worked.
+        settings_row = FleetSettings.load()
+        if not settings_row.kiosk_release_password:
+            return Response(
+                {"detail": "No disconnect password has been set. Ask an administrator to set one in Settings."},
+                status=409,
+            )
+
+        serializer = KioskReleaseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if not settings_row.check_kiosk_release_password(serializer.validated_data["password"]):
+            return Response({"detail": "That password is not correct."}, status=403)
+
+        device.installation_id = None
+        device.claimed_at = None
+        device.device_label = ""
+        device.save(update_fields=["installation_id", "claimed_at", "device_label"])
+
+        AuditLogEntry.objects.create(
+            user=None,
+            transaction=f"Kiosk device disconnected — {device.name}",
+            previous_value="Paired",
+            new_value="Awaiting pairing",
+        )
+        return Response({"detail": "This device has been disconnected."})

@@ -251,3 +251,15 @@ class KioskClaimSerializer(serializers.Serializer):
     # the key — so they keep working until they're retired.
     app = serializers.ChoiceField(choices=KioskDevice.App.choices, required=False)
     device_label = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+
+
+class KioskReleaseSerializer(serializers.Serializer):
+    """A kiosk asking to be unpaired from the fleet it is bound to.
+
+    Deliberately not an admin action: the person holding the phone is the one
+    who knows it should be released, and making them wait on someone with a
+    console is how devices end up shared and unaccounted for. The password is
+    what stops the guard using the phone from doing it on their own.
+    """
+
+    password = serializers.CharField(trim_whitespace=False)

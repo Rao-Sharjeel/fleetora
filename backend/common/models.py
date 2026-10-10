@@ -1,3 +1,4 @@
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models, transaction
 
 
@@ -12,6 +13,12 @@ class FleetSettings(models.Model):
     due_soon_km = models.PositiveIntegerField(default=1000)
     urgent_km = models.PositiveIntegerField(default=500)
 
+    # Hashed, never the raw value — this is a credential, and it is read back
+    # by nothing. Blank means no password has been set, which disables
+    # releasing a device entirely rather than leaving it open: an unset
+    # password must not read as "no password required".
+    kiosk_release_password = models.CharField(max_length=128, blank=True, default="")
+
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
@@ -20,6 +27,16 @@ class FleetSettings(models.Model):
     def load(cls) -> "FleetSettings":
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+    def set_kiosk_release_password(self, raw: str) -> None:
+        """Stores the password a kiosk must present to unpair itself. An empty
+        value clears it, which turns releasing off."""
+        self.kiosk_release_password = make_password(raw) if raw else ""
+
+    def check_kiosk_release_password(self, raw: str) -> bool:
+        if not self.kiosk_release_password:
+            return False
+        return check_password(raw, self.kiosk_release_password)
 
 
 class Sequence(models.Model):

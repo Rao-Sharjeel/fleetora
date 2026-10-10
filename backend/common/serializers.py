@@ -11,9 +11,35 @@ from common.models import FleetSettings
 
 
 class FleetSettingsSerializer(serializers.ModelSerializer):
+    """The hash never leaves the server. The admin screen needs to know only
+    whether a password exists, so it can say so and offer to replace it."""
+
+    kiosk_release_password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, trim_whitespace=False, max_length=128
+    )
+    kiosk_release_password_set = serializers.SerializerMethodField()
+
     class Meta:
         model = FleetSettings
-        fields = ["due_soon_km", "urgent_km"]
+        fields = ["due_soon_km", "urgent_km", "kiosk_release_password", "kiosk_release_password_set"]
+
+    def get_kiosk_release_password_set(self, obj: FleetSettings) -> bool:
+        return bool(obj.kiosk_release_password)
+
+    def validate_kiosk_release_password(self, value: str) -> str:
+        # Short enough to type on a phone at a gate, long enough not to be
+        # guessed in the handful of attempts the endpoint allows.
+        if value and len(value) < 4:
+            raise serializers.ValidationError("Use at least 4 characters.")
+        return value
+
+    def update(self, instance, validated_data):
+        raw = validated_data.pop("kiosk_release_password", None)
+        instance = super().update(instance, validated_data)
+        if raw is not None:
+            instance.set_kiosk_release_password(raw)
+            instance.save(update_fields=["kiosk_release_password"])
+        return instance
 
 
 class Base64ImageField(serializers.ImageField):

@@ -9,19 +9,35 @@ export interface MaintenanceThresholds {
 
 export interface AppSettings {
   maintenanceThresholds: MaintenanceThresholds;
+  /** Whether a kiosk disconnect password exists. The value itself is hashed
+   * server-side and never served — only its existence is. */
+  kioskReleasePasswordSet: boolean;
 }
 
 // The backend's /settings/ resource is flat ({dueSoonKm, urgentKm}) — nested here
 // under maintenanceThresholds since that's the only settings category today and the
 // UI is already built against that shape.
-function fromWire(wire: MaintenanceThresholds): AppSettings {
-  return { maintenanceThresholds: wire };
+interface SettingsWire extends MaintenanceThresholds {
+  kioskReleasePasswordSet: boolean;
+}
+
+function fromWire(wire: SettingsWire): AppSettings {
+  return {
+    maintenanceThresholds: { dueSoonKm: wire.dueSoonKm, urgentKm: wire.urgentKm },
+    kioskReleasePasswordSet: wire.kioskReleasePasswordSet,
+  };
 }
 
 export async function getSettings(): Promise<AppSettings> {
-  return fromWire(await apiGet<MaintenanceThresholds>("/settings/"));
+  return fromWire(await apiGet<SettingsWire>("/settings/"));
 }
 
 export async function updateMaintenanceThresholds(patch: Partial<MaintenanceThresholds>): Promise<AppSettings> {
-  return fromWire(await apiPatch<MaintenanceThresholds>("/settings/", patch));
+  return fromWire(await apiPatch<SettingsWire>("/settings/", patch));
+}
+
+/** Sets the password a kiosk must present to unpair itself; "" removes it,
+ * which disables disconnecting from the device altogether. */
+export async function updateKioskReleasePassword(password: string): Promise<AppSettings> {
+  return fromWire(await apiPatch<SettingsWire>("/settings/", { kioskReleasePassword: password }));
 }

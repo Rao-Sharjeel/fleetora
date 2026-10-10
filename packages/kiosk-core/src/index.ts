@@ -17,6 +17,7 @@ export { BuildStamp } from "./components/build-stamp";
 export { OdometerDigits } from "./components/odometer-digits";
 export { CameraDiagnostics } from "./components/camera-diagnostics";
 export { UpdateButton } from "./components/update-button";
+export { DisconnectDialog } from "./components/disconnect-dialog";
 export { checkForUpdate, hardReset } from "./lib/app-update";
 export { getBuildId } from "./lib/build-info";
 
@@ -39,6 +40,7 @@ export {
   createAlert,
   readOdometerReading,
   getKioskDeviceSelf,
+  releaseKioskDevice,
 } from "./lib/kiosk-api";
 
 export { useDeviceSession } from "./state/device-session";
