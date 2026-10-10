@@ -83,7 +83,16 @@ export function LauncherPage() {
           "radial-gradient(120% 55% at 50% -8%, color-mix(in srgb, var(--color-kiosk-accent) 32%, transparent), transparent 65%)",
       }}
     >
-      <img src="/drive-logo.png" alt="D-RIVE" className="h-auto w-[62%] max-w-[260px] object-contain" />
+      {/* The strapline variant, not the plain mark: this is the one place in
+          the kiosk shown large enough for "Dynamic Resource & Intelligent
+          Vehicle Ecosystem" to be legible. The header, pairing and
+          unsupported-device screens stay on the plain mark, where at 16-32px
+          tall the strapline would just be noise. */}
+      <img
+        src="/drive-logo-tagline.png"
+        alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
+        className="h-auto w-[86%] max-w-[340px] object-contain"
+      />
 
       <div className="flex w-full flex-col gap-4">
         {available.map((flow) => {

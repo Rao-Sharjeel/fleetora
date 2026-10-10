@@ -84,22 +84,6 @@
   color: rgba(230, 236, 245, 0.72);
 }
 
-/* The operating company, under the product wordmark. Deliberately quieter and
-   in the body face rather than the mono strapline face, so it reads as "whose
-   fleet this is" and not as a second tagline competing with the artwork's. */
-.fx-operator {
-  margin: 0.9rem 0 0;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: rgba(230, 236, 245, 0.9);
-}
-
-.fx-operator-panel {
-  margin-top: 0.6rem;
-  font-size: 0.9375rem;
-}
-
 .fx-powered {
   display: inline-flex;
   align-items: center;

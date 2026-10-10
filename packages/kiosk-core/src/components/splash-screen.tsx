@@ -21,7 +21,13 @@ export function SplashScreen({ wordmark, onBegin }: SplashScreenProps) {
       <div />
       <div className="flex flex-col items-center gap-3">
         {/* <img src="/fleetora-logo.png" alt="Fleetora" className="h-auto w-[78%] max-w-[320px] object-contain" /> */}
-        <img src="/drive-logo.png" alt="D-RIVE" className="h-auto w-[78%] max-w-[320px] object-contain" />
+        {/* Strapline variant — shown large enough here to read, unlike the
+            header and pairing screens. */}
+        <img
+          src="/drive-logo-tagline.png"
+          alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
+          className="h-auto w-[86%] max-w-[340px] object-contain"
+        />
         <span className="text-4xl font-extrabold tracking-tight text-kiosk-accent">{wordmark}</span>
       </div>
       <div className="flex w-full flex-col items-center gap-3">

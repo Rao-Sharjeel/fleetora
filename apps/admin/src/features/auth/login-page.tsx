@@ -56,16 +56,14 @@ export function LoginPage() {
       <div className="fx-scrim-mobile" aria-hidden />
 
       <header className="fx-brand">
-        {/* The artwork carries its own strapline ("Dynamic Resource &
-            Intelligent Vehicle Ecosystem"); the line below names the operator
-            whose fleet this console runs, which is a different thing and set
-            apart typographically so the two don't read as competing taglines. */}
+        {/* This artwork carries its own strapline ("Dynamic Resource &
+            Intelligent Vehicle Ecosystem"), so nothing else belongs under it —
+            a second line here reads as a competing tagline. */}
         <img
           className="fx-wordmark"
           src="/drive-logo-tagline.png"
           alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
         />
-        <p className="fx-operator">Dynamic Sportswear</p>
         <p className="fx-powered">
           powered by
           <img className="fx-sigma" src="/sigma-soft-logo.png" alt="" />
@@ -91,7 +89,6 @@ export function LoginPage() {
               src="/drive-logo-tagline.png"
               alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
             />
-            <p className="fx-operator fx-operator-panel">Dynamic Sportswear</p>
           </div>
 
           <p className="fx-eyebrow">Fleet operations console</p>
