@@ -28,8 +28,17 @@ COPY scripts/ scripts/
 # talks to a different path on that same origin, so it gets its own build.
 ARG VITE_API_BASE_URL
 ARG VITE_PLATFORM_API_BASE_URL
+# Which commit this image was built from, passed down by the deploy. Shown on
+# the kiosk's launcher/splash so an operator can tell at a glance whether the
+# phone is running the build that was just shipped — an installed PWA can keep
+# serving a cached bundle indefinitely, and from the outside that looks exactly
+# like a fix that did not work.
+ARG VITE_BUILD_ID=unknown
+ENV VITE_BUILD_ID=${VITE_BUILD_ID}
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-RUN npm run build:admin && npm run build:entry && npm run build:exit && npm run build:fuel && npm run build:kiosk
+RUN export VITE_BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" && \
+    npm run build:admin && npm run build:entry && npm run build:exit && \
+    npm run build:fuel && npm run build:kiosk
 ENV VITE_API_BASE_URL=${VITE_PLATFORM_API_BASE_URL}
 RUN npm run build:platform
 

@@ -9,6 +9,7 @@ import { ApiError } from "../lib/api-client";
 import { PrimaryButton } from "./kiosk-shell";
 import { CameraView } from "./camera-view";
 import { InstallBanner } from "./install-banner";
+import { BuildStamp } from "./build-stamp";
 
 /**
  * Shown once per device, on first launch. A key is issued from the admin
@@ -160,6 +161,7 @@ export function PairingScreen() {
       )}
 
       <InstallBanner />
+      <BuildStamp className="mt-2" />
     </div>
   );
 }

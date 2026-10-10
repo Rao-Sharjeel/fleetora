@@ -55,6 +55,9 @@ services:
       args:
         VITE_API_BASE_URL: https://api.drive.dynamic-sourcing.com/api
         VITE_PLATFORM_API_BASE_URL: https://api.drive.dynamic-sourcing.com/api/platform
+        # Set by the deploy script from the checked-out commit; "unknown" when
+        # someone builds by hand without exporting it.
+        VITE_BUILD_ID: ${BUILD_ID:-unknown}
     restart: unless-stopped
     ports:
       - "127.0.0.1:8092:80"

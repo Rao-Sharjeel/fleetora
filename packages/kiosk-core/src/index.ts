@@ -13,6 +13,8 @@ export { MobileOnlyGate } from "./components/mobile-only-gate";
 export { DeviceGate } from "./components/device-gate";
 export { PairingScreen } from "./components/pairing-screen";
 export { InstallBanner } from "./components/install-banner";
+export { BuildStamp } from "./components/build-stamp";
+export { getBuildId } from "./lib/build-info";
 
 export { useInstallPrompt } from "./hooks/use-install-prompt";
 

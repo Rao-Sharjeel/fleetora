@@ -1,4 +1,5 @@
 import { PrimaryButton } from "./kiosk-shell";
+import { BuildStamp } from "./build-stamp";
 
 interface SplashScreenProps {
   /** The word after FLEETORA — "EXIT", "ENTRY", "FUEL". */
@@ -29,6 +30,7 @@ export function SplashScreen({ wordmark, onBegin }: SplashScreenProps) {
           <span>Powered by SigmaSoft AI</span>
           <img src="/sigma-soft-logo.png" alt="" className="h-8 w-8 object-contain" />
         </div>
+        <BuildStamp />
       </div>
     </div>
   );
