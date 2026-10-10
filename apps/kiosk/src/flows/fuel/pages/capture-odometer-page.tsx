@@ -92,6 +92,20 @@ export function CaptureOdometerPage() {
         return;
       }
 
+      if (onDevice?.missingTrailingDigit && reading) {
+        // The drum is between two numbers. No screen here implements the
+        // "supply the last digit" prompt the reader offers, so until one does,
+        // say what was actually seen instead of sending the guard off to
+        // rephotograph a drum that will look exactly the same.
+        setMessage(
+          `Read ${Number(reading).toLocaleString()}_ — the last digit is mid-roll and can't be read from a photo. ` +
+            "Report it so an administrator can record the exact reading.",
+        );
+        setBlocked(true);
+        setBusy(false);
+        return;
+      }
+
       if (!confident) {
         // Nobody here can correct a reading, so an unsure one is not offered
         // for approval — that would just be a guard rubber-stamping a number

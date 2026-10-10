@@ -88,6 +88,19 @@ const MIN_VARIANT_AGREEMENT = 5 / 6;
 const MID_ROLL_MIN_DIGIT = 0.9;
 
 /**
+ * How far above the last reading a mid-roll candidate may imply.
+ *
+ * Mid-roll means the same odometer with its final digit between numbers, so
+ * the true value sits just above the last recorded one. Without this bound the
+ * digit-count test alone was enough: a correct 5-digit read of 84417 against a
+ * 6-digit recorded 200000 was taken as "844 17_" — a complete, high-confidence
+ * reading turned into a mid-roll on a vehicle it had nothing to do with, and
+ * since no screen implements the mid-roll prompt it surfaced to the operator
+ * as "couldn't read, try another angle".
+ */
+const MID_ROLL_MAX_RATIO = 1.1;
+
+/**
  * Indices of '0'-'9' in PP-OCR's 6625-entry charset (`<blank>` + keys + ' ').
  * Scattered rather than contiguous, so looked up rather than derived from a
  * range; `assertCharsetMatches` re-checks against the model's output width.
@@ -521,6 +534,9 @@ function asMissingTrailingDigit(
     if (candidate.digits.some((d) => d.confidence < MID_ROLL_MIN_DIGIT)) continue;
     // With any trailing digit, does it land at or above the last reading?
     if (Number(text + "9") < lastOdometer) continue;
+    // ...and not absurdly above it. The same drum a little further on, not a
+    // different odometer entirely.
+    if (Number(text + "0") > lastOdometer * MID_ROLL_MAX_RATIO) continue;
     return {
       reading: text,
       confidence: meanConfidence(candidate.digits),
@@ -546,8 +562,20 @@ function asBelowLastOdometer(
   lastOdometer: number | undefined,
 ): OdometerReading | null {
   if (lastOdometer === undefined) return null;
+  const expectedDigits = String(lastOdometer).length;
   const below = candidates
-    .filter((c) => c.value < lastOdometer && String(c.value).length >= MIN_DIGITS)
+    .filter(
+      (c) =>
+        c.value < lastOdometer &&
+        String(c.value).length >= MIN_DIGITS &&
+        // Within a digit of the recorded reading's magnitude. Two or more
+        // short is not "this odometer went backwards", it is some other
+        // number on the cluster — on the mid-roll sample it surfaced the
+        // vehicle's own registration from a sticker (1131 against 640852),
+        // and announcing that as a rejected odometer reading is worse than
+        // saying nothing.
+        Math.abs(String(c.value).length - expectedDigits) <= 1,
+    )
     // Same ordering pickBest uses, so this names the reading that would have
     // won had the floor not excluded it.
     .sort((a, b) => b.agreement - a.agreement || meanConfidence(b.digits) - meanConfidence(a.digits));
