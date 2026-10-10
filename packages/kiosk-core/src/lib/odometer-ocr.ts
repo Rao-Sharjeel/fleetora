@@ -29,6 +29,29 @@ const DET_MODEL_URL = "/ocr/ppocr-det.onnx";
 const INPUT_HEIGHT = 48;
 
 /**
+ * Longest edge the pipeline works at.
+ *
+ * Captures now come from the camera's photo pipeline where that exists, which
+ * on a modern phone means something like 4032x3024. The recogniser benefits
+ * from those pixels, but the whole-image passes here — equalise, autoContrast —
+ * are per-pixel JavaScript loops, and running them over 12 MP turns a slow
+ * capture into an unusable one. This keeps roughly double the old preview's
+ * detail while leaving those loops bounded.
+ */
+const WORK_LIMIT = 2400;
+
+/**
+ * How many detected regions to actually read.
+ *
+ * A dashboard detects as a dozen-plus text regions — dial numbers, warning
+ * text, the trip meter, badge lettering — and each one was being read at up to
+ * six crop variants, three times over as the attempts escalated. Ranking them
+ * by how odometer-shaped they are and reading only the best few is most of the
+ * speed-up, because the odometer is reliably among the first handful.
+ */
+const MAX_BOXES = 5;
+
+/**
  * Widths below this collapse repeated digits. CTC merges identical adjacent
  * labels unless a blank separates them, and at a crop's natural width there are
  * too few timesteps to emit one: "880088" came back as "88088" and "111111" as
@@ -232,6 +255,37 @@ function boostContrast(canvas: HTMLCanvasElement, factor: number): HTMLCanvasEle
   }
   ctx.putImageData(image, 0, 0);
   return out;
+}
+
+/** Downscales to WORK_LIMIT if needed; returns the original when it already
+ * fits, so the common preview-sized capture costs nothing. */
+function toWorkingSize(source: HTMLCanvasElement): HTMLCanvasElement {
+  const longest = Math.max(source.width, source.height);
+  if (longest <= WORK_LIMIT) return source;
+  const scale = WORK_LIMIT / longest;
+  return drawTo(source, Math.round(source.width * scale), Math.round(source.height * scale));
+}
+
+/**
+ * Orders detected regions by how much they look like an odometer.
+ *
+ * An odometer is a short, wide run of digits occupying a meaningful part of the
+ * cluster. Dial numbers are small and near-square; warning text is long and
+ * thin. This is only an ordering — nothing is discarded on shape alone, the cap
+ * does that — so a misjudged box costs position, not the reading.
+ */
+function rankBoxes(boxes: TextBox[]): TextBox[] {
+  return [...boxes]
+    .map((box) => {
+      const width = box.x2 - box.x1;
+      const height = box.y2 - box.y1;
+      const aspect = height > 0 ? width / height : 0;
+      // Peaks around 4:1 and falls away either side.
+      const aspectFit = 1 / (1 + Math.abs(Math.log(Math.max(aspect, 0.01) / 4)));
+      return { box, rank: aspectFit * Math.sqrt(width * height) * box.score };
+    })
+    .sort((a, b) => b.rank - a.rank)
+    .map((entry) => entry.box);
 }
 
 function assertCharsetMatches(charsetSize: number): void {
@@ -473,10 +527,11 @@ function asMissingTrailingDigit(
  * "ask the operator" rather than as an error.
  */
 export async function readOdometerOnDevice(
-  source: HTMLCanvasElement,
+  input: HTMLCanvasElement,
   options: ReadOdometerOptions = {},
 ): Promise<OdometerReading | null> {
   const [det, rec] = await Promise.all([getDetSession(), getRecSession()]);
+  const source = toWorkingSize(input);
 
   // Escalating rather than doing everything up front. Running all three
   // detection passes and all six crop variants took ~6s per capture in the
@@ -495,7 +550,12 @@ export async function readOdometerOnDevice(
   // wait is preferred to handing the operator a keypad on a reading the
   // pipeline would have got right. The capture screen shows progress
   // throughout, so the wait is visible rather than a frozen screen.
-  const DEADLINE_MS = 22000;
+  // Was 22s, which is far too long to stand at a gate holding a phone up to a
+  // windscreen — long enough that operators assumed it had hung. Ranking and
+  // capping the boxes above cut the per-attempt cost enough that the ceiling
+  // can come down with it; a capture that still hasn't resolved by here is one
+  // the operator is better off typing than waiting on.
+  const DEADLINE_MS = 12000;
   const startedAt = Date.now();
 
   let allCandidates: BoxCandidate[] = [];
@@ -520,10 +580,14 @@ export async function readOdometerOnDevice(
         ),
       );
     }
-    const boxes = mergeBoxes(detected);
+    const boxes = rankBoxes(mergeBoxes(detected)).slice(0, MAX_BOXES);
 
     allCandidates = [];
     for (const box of boxes) {
+      // Checked per box, not just per attempt: one attempt across several boxes
+      // could already outrun the budget on its own, and the whole point of the
+      // deadline is that the operator gets an answer either way.
+      if (Date.now() - startedAt > DEADLINE_MS) break;
       allCandidates.push(...(await readBox(rec, source, box, attempt.withContrast, options)));
     }
     seenCandidates.push(...allCandidates);

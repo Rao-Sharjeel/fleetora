@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Flashlight, FlashlightOff, Loader2, ZoomIn } from "lucide-react";
 import { decodeQr } from "../lib/barcode";
-import { captureSharpestCrop, mapOverlayToVideoRect } from "../lib/frame-capture";
+import { captureSharpestCrop, captureStillFrame, mapOverlayToVideoRect, toStoredJpeg } from "../lib/frame-capture";
+import { focusAt, readCapabilities, setTorch, setZoom, type CameraCapabilities } from "../lib/camera-controls";
 
 interface CameraViewProps {
   onCapture: (canvas: HTMLCanvasElement, dataUrl: string) => void;
@@ -42,6 +43,13 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
 };
 
+/** Where a tap-to-focus ring is showing, in element CSS pixels. */
+interface FocusPoint {
+  left: number;
+  top: number;
+  key: number;
+}
+
 export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -49,6 +57,12 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [capturing, setCapturing] = useState(false);
+  const [caps, setCaps] = useState<CameraCapabilities>({ torch: false, zoom: null, tapToFocus: false });
+  const [torchOn, setTorchOn] = useState(false);
+  const [zoom, setZoomValue] = useState(1);
+  const [focusPoint, setFocusPoint] = useState<FocusPoint | null>(null);
+
+  const track = () => streamRef.current?.getVideoTracks()[0] ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +79,15 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
+        }
+        // Read after play(): some Android builds report empty capabilities
+        // until the track is actually producing frames.
+        const videoTrack = stream.getVideoTracks()[0] ?? null;
+        const available = readCapabilities(videoTrack);
+        if (!cancelled) {
+          setCaps(available);
+          setZoomValue(available.zoom?.min ?? 1);
+          setTorchOn(false);
         }
       } catch {
         if (!cancelled) setError("Camera access is required to continue. Please allow camera access and try again.");
@@ -111,7 +134,7 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
 
   /** The region the dashed frame is drawn over, in the video's own pixels.
    * Falls back to the whole frame when there's no frame overlay to measure. */
-  function currentCropRect() {
+  const currentCropRect = useCallback(() => {
     const video = videoRef.current!;
     const overlay = overlayRef.current;
     // No measured overlay (QR/photo variants) means capture the full frame,
@@ -125,11 +148,40 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
       width: overlayBox.width,
       height: overlayBox.height,
     });
-  }
+  }, []);
 
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+  }
+
+  async function toggleTorch() {
+    const videoTrack = track();
+    if (!videoTrack) return;
+    const next = !torchOn;
+    if (await setTorch(videoTrack, next)) setTorchOn(next);
+  }
+
+  function onZoomChange(next: number) {
+    setZoomValue(next);
+    const videoTrack = track();
+    if (videoTrack) void setZoom(videoTrack, next);
+  }
+
+  /** Tap the preview to refocus there. */
+  async function handleFocusTap(event: React.MouseEvent<HTMLDivElement>) {
+    const videoTrack = track();
+    const video = videoRef.current;
+    if (!videoTrack || !video || !caps.tapToFocus) return;
+    const box = video.getBoundingClientRect();
+    const left = event.clientX - box.left;
+    const top = event.clientY - box.top;
+    setFocusPoint({ left, top, key: Date.now() });
+    // pointsOfInterest is in frame coordinates, and the preview is drawn with
+    // object-fit: cover — so the tap has to be mapped the same way a crop is,
+    // or the camera focuses on the wrong part of the scene.
+    const rect = mapOverlayToVideoRect(video, { left, top, width: 1, height: 1 });
+    await focusAt(videoTrack, rect.x / video.videoWidth, rect.y / video.videoHeight);
   }
 
   async function capture() {
@@ -137,13 +189,23 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     if (!video || video.videoWidth === 0 || capturing) return;
     setCapturing(true);
     try {
-      const canvas = await captureSharpestCrop(video, currentCropRect);
+      const videoTrack = track();
+      // A full-resolution still first — several times the pixels on the digits,
+      // which is what the recogniser is short of. Only for the odometer: the QR
+      // path reads the live preview and a shutter round-trip would slow it
+      // down for no gain.
+      let canvas: HTMLCanvasElement | null = null;
+      if (variant === "odometer" && videoTrack) {
+        canvas = await captureStillFrame(videoTrack);
+      }
+      if (!canvas) canvas = await captureSharpestCrop(video, currentCropRect);
       // Release the camera the moment the frames are in hand. What follows —
       // OCR — can take seconds, and leaving the stream live keeps the camera
       // indicator on and the preview moving as though nothing was captured.
       stopStream();
       if (!canvas) return;
-      onCapture(canvas, canvas.toDataURL("image/jpeg", 0.92));
+      // Full canvas to the OCR, a bounded copy for storage and upload.
+      onCapture(canvas, toStoredJpeg(canvas));
     } finally {
       setCapturing(false);
     }
@@ -167,7 +229,11 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
-        <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div className="absolute inset-0" onClick={handleFocusTap}>
+          <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+        </div>
+
         {variant === "frame" && (
           <div className="pointer-events-none absolute inset-8 rounded-xl border-2 border-dashed border-kiosk-accent/80" />
         )}
@@ -179,6 +245,47 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           // nothing is cropped to it.
           <div className="pointer-events-none absolute inset-4 rounded-xl border border-dashed border-kiosk-accent/40" />
         )}
+
+        {focusPoint && (
+          <span
+            key={focusPoint.key}
+            className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border-2 border-kiosk-accent"
+            style={{ left: focusPoint.left, top: focusPoint.top, animationIterationCount: 1 }}
+            onAnimationEnd={() => setFocusPoint(null)}
+          />
+        )}
+
+        {caps.torch && (
+          <button
+            type="button"
+            onClick={toggleTorch}
+            aria-label={torchOn ? "Turn flashlight off" : "Turn flashlight on"}
+            aria-pressed={torchOn}
+            className={`absolute right-3 top-3 flex h-12 w-12 items-center justify-center rounded-full backdrop-blur active:scale-95 ${
+              torchOn ? "bg-kiosk-accent text-white" : "bg-black/60 text-white"
+            }`}
+          >
+            {torchOn ? <Flashlight className="h-5 w-5" /> : <FlashlightOff className="h-5 w-5" />}
+          </button>
+        )}
+
+        {caps.zoom && (
+          <div className="absolute inset-x-4 bottom-12 flex items-center gap-3 rounded-full bg-black/60 px-4 py-2 backdrop-blur">
+            <ZoomIn className="h-4 w-4 shrink-0 text-white" />
+            <input
+              type="range"
+              aria-label="Zoom"
+              min={caps.zoom.min}
+              max={caps.zoom.max}
+              step={caps.zoom.step}
+              value={zoom}
+              onChange={(e) => onZoomChange(Number(e.target.value))}
+              className="h-6 w-full accent-kiosk-accent"
+            />
+            <span className="w-10 shrink-0 text-right text-xs text-white">{zoom.toFixed(1)}×</span>
+          </div>
+        )}
+
         {capturing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70">
             <Loader2 className="h-8 w-8 animate-spin text-kiosk-accent" />

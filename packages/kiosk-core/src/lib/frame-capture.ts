@@ -159,3 +159,71 @@ export async function captureSharpestCrop(
   }
   return best;
 }
+
+/**
+ * A still at the camera's *photo* resolution rather than the preview's.
+ *
+ * The preview stream is typically 1920x1080 even on a phone whose sensor will
+ * produce 12 MP, and on a dashboard shot the odometer occupies a small part of
+ * the frame — so the digits survive as a few dozen pixels, get downscaled again
+ * by the detector's 960px limit, and arrive at the recogniser as mush. A full
+ * still gives the same digits several times the pixels.
+ *
+ * ImageCapture is Android Chrome only; everywhere else this returns null and
+ * the caller falls back to the preview burst. takePhoto() also fails on some
+ * devices that advertise it, which is why the whole thing is wrapped.
+ */
+const STILL_TIMEOUT_MS = 1500;
+
+export async function captureStillFrame(track: MediaStreamTrack): Promise<HTMLCanvasElement | null> {
+  const Ctor = (globalThis as { ImageCapture?: new (t: MediaStreamTrack) => { takePhoto: () => Promise<Blob> } })
+    .ImageCapture;
+  if (!Ctor) return null;
+  try {
+    // Some devices take a full autofocus/exposure cycle over this, or never
+    // settle at all. The preview burst is a perfectly good capture, so a slow
+    // shutter is not worth waiting out — the whole complaint being addressed
+    // here is how long a reading takes.
+    const blob = await Promise.race([
+      new Ctor(track).takePhoto(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), STILL_TIMEOUT_MS)),
+    ]);
+    if (!blob) return null;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    // A still that came back smaller than the preview is no use — some devices
+    // answer takePhoto() from the preview pipeline.
+    return canvas.width >= 640 ? canvas : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A JPEG data URL of a capture, bounded in size.
+ *
+ * The canvas handed to the OCR is now whatever the camera's photo pipeline
+ * produced, which can be 12 MP. Encoding that straight to a data URL yields
+ * several megabytes of base64 that is then held in session state and uploaded
+ * as the odometer photo — so the stored copy is scaled down first. This is
+ * evidence for a human looking at a disputed reading, not something the models
+ * ever see again.
+ */
+export function toStoredJpeg(canvas: HTMLCanvasElement, maxEdge = 1600, quality = 0.9): string {
+  const longest = Math.max(canvas.width, canvas.height);
+  if (longest <= maxEdge) return canvas.toDataURL("image/jpeg", quality);
+  const scale = maxEdge / longest;
+  const out = document.createElement("canvas");
+  out.width = Math.round(canvas.width * scale);
+  out.height = Math.round(canvas.height * scale);
+  const ctx = out.getContext("2d");
+  if (!ctx) return canvas.toDataURL("image/jpeg", quality);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(canvas, 0, 0, out.width, out.height);
+  return out.toDataURL("image/jpeg", quality);
+}

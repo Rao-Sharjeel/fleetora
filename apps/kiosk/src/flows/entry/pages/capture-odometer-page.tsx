@@ -48,17 +48,29 @@ export function CaptureOdometerPage() {
       // On-device first: it finds and reads the digits anywhere on the
       // cluster, and needs no round trip. The server stays as the fallback for
       // devices where the model won't load.
-      const onDevice = await readOdometerOnDevice(canvas, {
-        // Anything below the last recorded reading isn't this odometer — it's
-        // a trip meter, a dial number, or the vehicle's own QR label, all of
-        // which showed up as candidates on real dashboards.
-        lastOdometer: vehicle?.currentOdometer,
-        excludeValues: qrDigits(vehicle?.registrationNumber, vehicle?.qrCode),
-      }).catch(() => null);
+      // A decline and a breakdown are different things, and collapsing them
+      // cost seconds on every failed capture: the model declining sent the
+      // photo to the server as well, where Tesseract reads roughly 1 in 8 of
+      // these — a round trip that almost never changes the answer. The server
+      // is the fallback for a device whose model won't load, which is what a
+      // thrown error means.
+      let onDevice: Awaited<ReturnType<typeof readOdometerOnDevice>> = null;
+      let modelRan = true;
+      try {
+        onDevice = await readOdometerOnDevice(canvas, {
+          // Anything below the last recorded reading isn't this odometer —
+          // it's a trip meter, a dial number, or the vehicle's own QR label,
+          // all of which showed up as candidates on real dashboards.
+          lastOdometer: vehicle?.currentOdometer,
+          excludeValues: qrDigits(vehicle?.registrationNumber, vehicle?.qrCode),
+        });
+      } catch {
+        modelRan = false;
+      }
 
-      const result = onDevice ?? (await readOdometerReading(dataUrl));
-      const reading = result.reading ?? "";
-      const confident = Boolean(reading) && result.confident;
+      const result = onDevice ?? (modelRan ? null : await readOdometerReading(dataUrl));
+      const reading = result?.reading ?? "";
+      const confident = Boolean(reading) && Boolean(result?.confident);
 
       if (!confident) {
         // Nobody here can correct a reading, so an unsure one is not offered
@@ -80,7 +92,10 @@ export function CaptureOdometerPage() {
   return (
     <KioskShell onBack={() => setStep("SCAN_VEHICLE")}>
       <h1 className="text-lg font-semibold">Capture Odometer Reading</h1>
-      <p className="text-sm text-kiosk-muted">Point the camera at the instrument cluster — the odometer is found automatically.</p>
+      <p className="text-sm text-kiosk-muted">
+        Fill the frame with the odometer — use the zoom slider, the light if it's dim, and tap the preview to
+        focus.
+      </p>
       {message && <p className="rounded-lg bg-kiosk-danger/10 p-2 text-center text-sm text-kiosk-danger">{message}</p>}
       {busy ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-kiosk-muted">
@@ -88,7 +103,7 @@ export function CaptureOdometerPage() {
           Reading odometer…
         </div>
       ) : (
-        <CameraView variant="odometer" hint="Get the whole cluster in frame" onCapture={handleCapture} />
+        <CameraView variant="odometer" hint="Zoom in until the odometer fills the frame" onCapture={handleCapture} />
       )}
       {!busy && odometerAttempts >= ODOMETER_ATTEMPT_LIMIT && (
         <button
