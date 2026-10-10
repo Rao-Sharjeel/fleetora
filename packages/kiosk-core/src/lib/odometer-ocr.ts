@@ -121,6 +121,18 @@ export interface OdometerReading {
   missingTrailingDigit: boolean;
   /** True when nothing needs confirming and the value can be prefilled. */
   confident: boolean;
+  /**
+   * The digits were read cleanly, but the number is below the vehicle's last
+   * recorded odometer, so it can't be accepted as a new reading.
+   *
+   * This is reported rather than folded into "couldn't read" because the two
+   * need opposite responses from the operator. A failed read wants another
+   * photo; this one will give the identical answer however many times it is
+   * retaken, and what it actually means is that the recorded reading is wrong,
+   * the cluster has been replaced, or this is the wrong vehicle — all of which
+   * belong with an administrator.
+   */
+  belowLastOdometer: boolean;
 }
 
 export interface ReadOdometerOptions {
@@ -480,6 +492,7 @@ function toReading(best: BoxCandidate): OdometerReading {
     uncertainPositions,
     missingTrailingDigit: false,
     confident: uncertainPositions.length === 0,
+    belowLastOdometer: false,
   };
 }
 
@@ -515,9 +528,40 @@ function asMissingTrailingDigit(
       uncertainPositions: [text.length],
       missingTrailingDigit: true,
       confident: false,
+      belowLastOdometer: false,
     };
   }
   return null;
+}
+
+/**
+ * A clean read that only failed the "must not go backwards" test.
+ *
+ * pickBest drops these, and without this they surface as "couldn't read" — so
+ * the operator retakes the same photo until the attempt limit, and nobody
+ * learns that the number was read perfectly and rejected on plausibility.
+ */
+function asBelowLastOdometer(
+  candidates: BoxCandidate[],
+  lastOdometer: number | undefined,
+): OdometerReading | null {
+  if (lastOdometer === undefined) return null;
+  const below = candidates
+    .filter((c) => c.value < lastOdometer && String(c.value).length >= MIN_DIGITS)
+    // Same ordering pickBest uses, so this names the reading that would have
+    // won had the floor not excluded it.
+    .sort((a, b) => b.agreement - a.agreement || meanConfidence(b.digits) - meanConfidence(a.digits));
+  const best = below[0];
+  if (!best || best.agreement / best.variants < MIN_VARIANT_AGREEMENT) return null;
+  return {
+    reading: String(best.value),
+    confidence: meanConfidence(best.digits),
+    digits: best.digits,
+    uncertainPositions: [],
+    missingTrailingDigit: false,
+    confident: false,
+    belowLastOdometer: true,
+  };
 }
 
 /**
@@ -629,5 +673,11 @@ export async function readOdometerOnDevice(
 
   // Nothing agreed. Before giving up, check whether this is the mid-roll case:
   // a solid read that is simply one digit short.
-  return asMissingTrailingDigit(seenCandidates, options.lastOdometer);
+  const midRoll = asMissingTrailingDigit(seenCandidates, options.lastOdometer);
+  if (midRoll) return midRoll;
+
+  // Last: a read that was fine except for going backwards. Reported so the
+  // operator is told that, rather than being sent to retake a photo that will
+  // keep producing the same rejected number.
+  return asBelowLastOdometer(seenCandidates, options.lastOdometer);
 }

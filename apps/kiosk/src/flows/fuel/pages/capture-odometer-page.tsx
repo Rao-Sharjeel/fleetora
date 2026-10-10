@@ -29,6 +29,10 @@ export function CaptureOdometerPage() {
   const vehicle = useFuelSession((s) => s.vehicle);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // A reading that was read cleanly and rejected for going backwards. Retaking
+  // the photo cannot change it, so the report route is offered straight away
+  // instead of after the usual run of failed attempts.
+  const [blocked, setBlocked] = useState(false);
 
   // Downloading the model on the way into the screen, rather than on the first
   // capture, keeps the wait off the operator's critical path.
@@ -39,6 +43,7 @@ export function CaptureOdometerPage() {
   async function handleCapture(canvas: HTMLCanvasElement, dataUrl: string) {
     setBusy(true);
     setMessage(null);
+    setBlocked(false);
     countOdometerAttempt();
     // The OCR runs on the main thread, so without giving the browser a frame
     // first the "Reading odometer…" state never gets painted — the camera
@@ -71,6 +76,21 @@ export function CaptureOdometerPage() {
       const result = onDevice ?? (modelRan ? null : await readOdometerReading(dataUrl));
       const reading = result?.reading ?? "";
       const confident = Boolean(reading) && Boolean(result?.confident);
+
+      // onDevice, not result: the server fallback has no notion of this.
+      if (onDevice?.belowLastOdometer && reading) {
+        // Read perfectly well — it just can't be a new reading for this
+        // vehicle. Saying "couldn't read" here sent guards back to photograph
+        // the same cluster until they ran out of attempts.
+        const last = vehicle?.currentOdometer?.toLocaleString() ?? "the last recorded value";
+        setMessage(
+          `Read ${Number(reading).toLocaleString()} km, which is below this vehicle's last recorded ${last} km. ` +
+            "A new photo won't change that — report it so an administrator can check the vehicle's recorded reading.",
+        );
+        setBlocked(true);
+        setBusy(false);
+        return;
+      }
 
       if (!confident) {
         // Nobody here can correct a reading, so an unsure one is not offered
@@ -105,7 +125,7 @@ export function CaptureOdometerPage() {
       ) : (
         <CameraView variant="odometer" hint="Zoom in until the odometer fills the frame" onCapture={handleCapture} />
       )}
-      {!busy && odometerAttempts >= ODOMETER_ATTEMPT_LIMIT && (
+      {!busy && (blocked || odometerAttempts >= ODOMETER_ATTEMPT_LIMIT) && (
         <button
           type="button"
           onClick={() => setStep("REPORT_ODOMETER")}
