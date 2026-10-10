@@ -15,6 +15,7 @@ export { PairingScreen } from "./components/pairing-screen";
 export { InstallBanner } from "./components/install-banner";
 export { BuildStamp } from "./components/build-stamp";
 export { OdometerDigits } from "./components/odometer-digits";
+export { CameraDiagnostics } from "./components/camera-diagnostics";
 export { getBuildId } from "./lib/build-info";
 
 export { useInstallPrompt } from "./hooks/use-install-prompt";

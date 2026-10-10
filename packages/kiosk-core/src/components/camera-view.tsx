@@ -10,6 +10,7 @@ import {
   toStoredJpeg,
 } from "../lib/frame-capture";
 import { findDigitsNear } from "../lib/odometer-ocr";
+import { CameraDiagnostics } from "./camera-diagnostics";
 import { focusAt, readCapabilities, setTorch, setZoom, type CameraCapabilities } from "../lib/camera-controls";
 
 interface CameraViewProps {
@@ -88,11 +89,13 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   const [lockMissed, setLockMissed] = useState(false);
   /** The stream was acquired but no frames are arriving — a black preview. */
   const [stalled, setStalled] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const track = () => streamRef.current?.getVideoTracks()[0] ?? null;
 
   /** Whether the one automatic restart has been spent on the current stall. */
   const healedRef = useRef(false);
+  const longPressRef = useRef<number | undefined>(undefined);
 
   const restart = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -424,13 +427,17 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
         <div className="absolute inset-0 overflow-hidden" onClick={handlePreviewTap}>
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className="h-full w-full object-cover transition-transform duration-300"
-            style={lockZoom ?? undefined}
-          />
+          {/* The transform goes on a wrapper, never on the <video> itself.
+              Android WebViews commonly render video through a hardware overlay,
+              and transforming or compositing that element is a known way to get
+              a black rectangle with the stream running perfectly behind it —
+              which is indistinguishable, on the phone, from the camera failing
+              to start. `autoPlay` is belt-and-braces next to the explicit
+              play(): some WebViews never honour the call on a freshly attached
+              srcObject. */}
+          <div className="h-full w-full transition-transform duration-300" style={lockZoom ?? undefined}>
+            <video ref={videoRef} playsInline autoPlay muted className="h-full w-full object-cover" />
+          </div>
         </div>
 
         {variant === "frame" && (
@@ -492,7 +499,13 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         <button
           type="button"
           onClick={restart}
-          aria-label="Restart the camera"
+          onPointerDown={() => {
+            longPressRef.current = window.setTimeout(() => setShowDiagnostics(true), 700);
+          }}
+          onPointerUp={() => window.clearTimeout(longPressRef.current)}
+          onPointerLeave={() => window.clearTimeout(longPressRef.current)}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-label="Restart the camera (hold for diagnostics)"
           className={`absolute right-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur active:scale-95 ${
             caps.torch ? "top-[4.25rem]" : "top-3"
           }`}
@@ -545,6 +558,15 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
               <RefreshCw className="h-4 w-4" /> Restart camera
             </button>
           </div>
+        )}
+
+        {showDiagnostics && (
+          <CameraDiagnostics
+            stream={streamRef.current}
+            video={videoRef.current}
+            stalled={stalled}
+            onClose={() => setShowDiagnostics(false)}
+          />
         )}
 
         {capturing && (
