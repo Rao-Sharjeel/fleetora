@@ -1,5 +1,5 @@
 import { LogOut, LogIn, Fuel } from "lucide-react";
-import { BuildStamp, configureKiosk, useDeviceSession, type KioskApp } from "@fleetora/kiosk-core";
+import { BuildStamp, UpdateButton, configureKiosk, useDeviceSession, type KioskApp } from "@fleetora/kiosk-core";
 import { useKioskMode } from "@/state/kiosk-mode";
 import { useExitSession } from "@/flows/exit/exit-session";
 import { useEntrySession } from "@/flows/entry/entry-session";
@@ -111,12 +111,15 @@ export function LauncherPage() {
         )}
       </div>
 
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 text-xs text-kiosk-muted">
           <span>Powered by SigmaSoft AI</span>
           <img src="/sigma-soft-logo.png" alt="" className="h-8 w-8 object-contain" />
         </div>
-        <BuildStamp />
+        <div className="flex items-center gap-3">
+          <BuildStamp />
+          <UpdateButton />
+        </div>
       </div>
     </div>
   );
