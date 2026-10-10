@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Crosshair, Flashlight, FlashlightOff, Loader2, X, ZoomIn } from "lucide-react";
+import { Crosshair, Flashlight, FlashlightOff, Loader2, RefreshCw, X, ZoomIn } from "lucide-react";
 import { decodeQr } from "../lib/barcode";
 import {
   captureSharpestCrop,
@@ -86,8 +86,22 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   const [lockZoom, setLockZoom] = useState<{ transform: string; transformOrigin: string } | undefined>();
   const [locking, setLocking] = useState(false);
   const [lockMissed, setLockMissed] = useState(false);
+  /** The stream was acquired but no frames are arriving — a black preview. */
+  const [stalled, setStalled] = useState(false);
 
   const track = () => streamRef.current?.getVideoTracks()[0] ?? null;
+
+  /** Whether the one automatic restart has been spent on the current stall. */
+  const healedRef = useRef(false);
+
+  const restart = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setStalled(false);
+    setLocked(null);
+    setLockZoom(undefined);
+    setAttempt((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +140,78 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
       streamRef.current = null;
     };
   }, [attempt]);
+
+  /**
+   * Watches a stream that started successfully for having quietly died.
+   *
+   * getUserMedia resolving is not the same as frames arriving. In a kiosk
+   * browser the camera is routinely taken away mid-session — the launcher
+   * grabs it, the device sleeps and resumes, another app opens — and what the
+   * operator sees is a black rectangle with no error, because nothing failed
+   * in a way the promise could report. The track reports `mute`/`ended` for
+   * some of those, and for the rest the only symptom is currentTime refusing
+   * to advance.
+   */
+  useEffect(() => {
+    if (error) return;
+    let last = -1;
+    let strikes = 0;
+
+    const check = () => {
+      const video = videoRef.current;
+      const videoTrack = track();
+      if (!video || !videoTrack) return;
+      const dead = videoTrack.readyState === "ended" || videoTrack.muted;
+      const frozen = video.videoWidth === 0 || video.currentTime === last;
+      last = video.currentTime;
+      // Two consecutive misses, so a single slow tick doesn't cry wolf.
+      strikes = dead || frozen ? strikes + 1 : 0;
+      if (strikes >= 2) {
+        setStalled(true);
+      } else if (!dead && !frozen) {
+        setStalled(false);
+        healedRef.current = false;
+      }
+    };
+
+    const timer = window.setInterval(check, 1500);
+    const videoTrack = track();
+    const onDead = () => setStalled(true);
+    videoTrack?.addEventListener("ended", onDead);
+    videoTrack?.addEventListener("mute", onDead);
+
+    // Coming back from the launcher or a locked screen is the single most
+    // common way this happens, and it is also the one moment we can react to
+    // directly rather than waiting for the poll.
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const t = track();
+      if (!t || t.readyState === "ended" || t.muted) setStalled(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      window.clearInterval(timer);
+      videoTrack?.removeEventListener("ended", onDead);
+      videoTrack?.removeEventListener("mute", onDead);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [attempt, error]);
+
+  /**
+   * One silent restart before saying anything.
+   *
+   * Most stalls are a camera that was taken away and handed back, and
+   * re-acquiring the stream fixes them outright. Asking the operator to press
+   * something for a problem the app can fix itself is a worse gate experience
+   * than a half-second flicker. If it stalls again the overlay appears, and
+   * from then on it is the operator's call.
+   */
+  useEffect(() => {
+    if (!stalled || healedRef.current) return;
+    healedRef.current = true;
+    restart();
+  }, [stalled, restart]);
 
   useEffect(() => {
     if (!locked) return;
@@ -403,6 +489,17 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           />
         )}
 
+        <button
+          type="button"
+          onClick={restart}
+          aria-label="Restart the camera"
+          className={`absolute right-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur active:scale-95 ${
+            caps.torch ? "top-[4.25rem]" : "top-3"
+          }`}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
+
         {caps.torch && (
           <button
             type="button"
@@ -431,6 +528,22 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
               className="h-6 w-full accent-kiosk-accent"
             />
             <span className="w-10 shrink-0 text-right text-xs text-white">{zoom.toFixed(1)}×</span>
+          </div>
+        )}
+
+        {stalled && !capturing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
+            <p className="text-sm text-white">The camera isn't sending a picture.</p>
+            <p className="text-xs text-kiosk-muted">
+              Something else may have taken it — close any other camera app, then restart.
+            </p>
+            <button
+              type="button"
+              onClick={restart}
+              className="flex items-center gap-2 rounded-xl bg-kiosk-accent px-5 py-2.5 text-sm font-semibold text-white active:scale-95"
+            >
+              <RefreshCw className="h-4 w-4" /> Restart camera
+            </button>
           </div>
         )}
 
