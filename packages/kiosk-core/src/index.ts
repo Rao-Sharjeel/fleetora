@@ -14,13 +14,14 @@ export { DeviceGate } from "./components/device-gate";
 export { PairingScreen } from "./components/pairing-screen";
 export { InstallBanner } from "./components/install-banner";
 export { BuildStamp } from "./components/build-stamp";
+export { OdometerDigits } from "./components/odometer-digits";
 export { getBuildId } from "./lib/build-info";
 
 export { useInstallPrompt } from "./hooks/use-install-prompt";
 
 export { decodeQr } from "./lib/barcode";
 export { toStoredJpeg } from "./lib/frame-capture";
-export { readOdometerOnDevice, preloadOdometerModel } from "./lib/odometer-ocr";
+export { readOdometerOnDevice, preloadOdometerModel, findDigitsNear } from "./lib/odometer-ocr";
 export type { OdometerReading as OnDeviceOdometerReading, DigitReading, ReadOdometerOptions } from "./lib/odometer-ocr";
 export { formatTimestamp } from "./lib/format";
 export { ApiError } from "./lib/api-client";

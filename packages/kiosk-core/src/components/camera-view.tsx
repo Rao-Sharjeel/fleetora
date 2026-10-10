@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Flashlight, FlashlightOff, Loader2, ZoomIn } from "lucide-react";
+import { Crosshair, Flashlight, FlashlightOff, Loader2, X, ZoomIn } from "lucide-react";
 import { decodeQr } from "../lib/barcode";
-import { captureSharpestCrop, captureStillFrame, mapOverlayToVideoRect, toStoredJpeg } from "../lib/frame-capture";
+import {
+  captureSharpestCrop,
+  captureStillFrame,
+  cropVideoToCanvas,
+  mapOverlayToVideoRect,
+  regionZoomTransform,
+  toStoredJpeg,
+} from "../lib/frame-capture";
+import { findDigitsNear } from "../lib/odometer-ocr";
 import { focusAt, readCapabilities, setTorch, setZoom, type CameraCapabilities } from "../lib/camera-controls";
 
 interface CameraViewProps {
@@ -50,6 +58,19 @@ interface FocusPoint {
   key: number;
 }
 
+/** A digit region the operator has locked onto, in the video's own pixels. */
+interface LockedRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Padding around a locked region when it is cropped for the reader — the
+ * detector's boxes hug the glyphs, and a crop that shaves them costs digits. */
+const LOCK_PAD_X = 0.06;
+const LOCK_PAD_Y = 0.35;
+
 export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -61,6 +82,10 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   const [torchOn, setTorchOn] = useState(false);
   const [zoom, setZoomValue] = useState(1);
   const [focusPoint, setFocusPoint] = useState<FocusPoint | null>(null);
+  const [locked, setLocked] = useState<LockedRegion | null>(null);
+  const [lockZoom, setLockZoom] = useState<{ transform: string; transformOrigin: string } | undefined>();
+  const [locking, setLocking] = useState(false);
+  const [lockMissed, setLockMissed] = useState(false);
 
   const track = () => streamRef.current?.getVideoTracks()[0] ?? null;
 
@@ -101,6 +126,20 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
       streamRef.current = null;
     };
   }, [attempt]);
+
+  useEffect(() => {
+    if (!locked) return;
+    const recompute = () => {
+      const video = videoRef.current;
+      if (video) setLockZoom(regionZoomTransform(video, locked) ?? undefined);
+    };
+    window.addEventListener("resize", recompute);
+    window.addEventListener("orientationchange", recompute);
+    return () => {
+      window.removeEventListener("resize", recompute);
+      window.removeEventListener("orientationchange", recompute);
+    };
+  }, [locked]);
 
   useEffect(() => {
     if (!onDetectQr) return;
@@ -168,20 +207,67 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     if (videoTrack) void setZoom(videoTrack, next);
   }
 
-  /** Tap the preview to refocus there. */
-  async function handleFocusTap(event: React.MouseEvent<HTMLDivElement>) {
-    const videoTrack = track();
+  /**
+   * Tap the preview: refocus there, and on the odometer screen, lock onto the
+   * digits under the tap.
+   *
+   * The detector is what fails on a hard cluster — glare, an unusual layout,
+   * digits already filling the frame. The operator can always see the
+   * odometer, so letting them point at it turns the pipeline's weakest step
+   * into a gesture.
+   */
+  async function handlePreviewTap(event: React.MouseEvent<HTMLDivElement>) {
     const video = videoRef.current;
-    if (!videoTrack || !video || !caps.tapToFocus) return;
+    if (!video || video.videoWidth === 0) return;
     const box = video.getBoundingClientRect();
     const left = event.clientX - box.left;
     const top = event.clientY - box.top;
     setFocusPoint({ left, top, key: Date.now() });
+
     // pointsOfInterest is in frame coordinates, and the preview is drawn with
     // object-fit: cover — so the tap has to be mapped the same way a crop is,
     // or the camera focuses on the wrong part of the scene.
-    const rect = mapOverlayToVideoRect(video, { left, top, width: 1, height: 1 });
-    await focusAt(videoTrack, rect.x / video.videoWidth, rect.y / video.videoHeight);
+    const point = mapOverlayToVideoRect(video, { left, top, width: 1, height: 1 });
+    const videoTrack = track();
+    if (videoTrack && caps.tapToFocus) {
+      void focusAt(videoTrack, point.x / video.videoWidth, point.y / video.videoHeight);
+    }
+
+    if (variant !== "odometer" || locking) return;
+    setLocking(true);
+    setLockMissed(false);
+    try {
+      const frame = cropVideoToCanvas(video, {
+        x: 0,
+        y: 0,
+        width: video.videoWidth,
+        height: video.videoHeight,
+      });
+      const found = await findDigitsNear(frame, point.x / video.videoWidth, point.y / video.videoHeight);
+      if (found) {
+        const region = {
+          x: found.x1,
+          y: found.y1,
+          width: found.x2 - found.x1,
+          height: found.y2 - found.y1,
+        };
+        setLocked(region);
+        setLockZoom(regionZoomTransform(video, region) ?? undefined);
+      } else {
+        // Leave any existing lock alone rather than dropping it on a stray tap.
+        setLockMissed(true);
+      }
+    } catch {
+      setLockMissed(true);
+    } finally {
+      setLocking(false);
+    }
+  }
+
+  function clearLock() {
+    setLocked(null);
+    setLockZoom(undefined);
+    setLockMissed(false);
   }
 
   async function capture() {
@@ -199,6 +285,27 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         canvas = await captureStillFrame(videoTrack);
       }
       if (!canvas) canvas = await captureSharpestCrop(video, currentCropRect);
+
+      // A locked region is in preview-frame pixels; a full-resolution still is
+      // larger, so scale before cropping or the crop lands somewhere else.
+      if (canvas && locked && video.videoWidth) {
+        const ratio = canvas.width / video.videoWidth;
+        const padX = locked.width * LOCK_PAD_X;
+        const padY = locked.height * LOCK_PAD_Y;
+        const x = Math.max(0, (locked.x - padX) * ratio);
+        const y = Math.max(0, (locked.y - padY) * ratio);
+        const width = Math.min(canvas.width - x, (locked.width + padX * 2) * ratio);
+        const height = Math.min(canvas.height - y, (locked.height + padY * 2) * ratio);
+        if (width >= 16 && height >= 8) {
+          const cropped = document.createElement("canvas");
+          cropped.width = Math.round(width);
+          cropped.height = Math.round(height);
+          cropped
+            .getContext("2d")
+            ?.drawImage(canvas, x, y, width, height, 0, 0, cropped.width, cropped.height);
+          canvas = cropped;
+        }
+      }
       // Release the camera the moment the frames are in hand. What follows —
       // OCR — can take seconds, and leaving the stream live keeps the camera
       // indicator on and the preview moving as though nothing was captured.
@@ -230,20 +337,61 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl bg-black">
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-        <div className="absolute inset-0" onClick={handleFocusTap}>
-          <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+        <div className="absolute inset-0 overflow-hidden" onClick={handlePreviewTap}>
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className="h-full w-full object-cover transition-transform duration-300"
+            style={lockZoom ?? undefined}
+          />
         </div>
 
         {variant === "frame" && (
           <div className="pointer-events-none absolute inset-8 rounded-xl border-2 border-dashed border-kiosk-accent/80" />
         )}
-        {variant === "odometer" && (
-          // No crop box: the OCR detects the digits itself, wherever they sit
-          // on the cluster. A fixed band had to be aimed, and on real
+        {variant === "odometer" && !locked && (
+          // No crop box by default: the reader finds the digits itself,
+          // wherever they sit. A fixed band had to be aimed, and on real
           // dashboards the odometer turned up bottom-right, mid-left and dead
-          // centre — the band missed it. This outline is guidance only, and
-          // nothing is cropped to it.
+          // centre. This outline is guidance only; nothing is cropped to it
+          // unless the operator taps to lock on.
           <div className="pointer-events-none absolute inset-4 rounded-xl border border-dashed border-kiosk-accent/40" />
+        )}
+
+        {variant === "odometer" && locked && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+            <span className="flex items-center gap-1.5 rounded-full bg-kiosk-accent/90 px-3 py-1 text-xs font-medium text-white">
+              <Crosshair className="h-3.5 w-3.5" /> Locked on these digits
+            </span>
+          </div>
+        )}
+
+        {variant === "odometer" && locked && (
+          <button
+            type="button"
+            onClick={clearLock}
+            aria-label="Clear the locked region"
+            className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur active:scale-95"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+
+        {locking && (
+          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center">
+            <span className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-xs text-white">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Finding the digits…
+            </span>
+          </div>
+        )}
+
+        {lockMissed && !locking && (
+          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center">
+            <span className="rounded-full bg-black/70 px-3 py-1 text-xs text-white">
+              No digits found there — tap directly on them.
+            </span>
+          </div>
         )}
 
         {focusPoint && (

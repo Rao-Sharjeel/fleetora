@@ -39,6 +39,10 @@ interface ExitSessionState {
   /** False when the OCR wasn't sure — the reading screen asks the operator to
    * check it rather than presenting a guess as if it were read cleanly. */
   odometerConfident: boolean;
+  /** Positions the reader doubted. Marked on the confirmation screen so
+   * the guard checks that digit against the photo rather than the whole
+   * number being discarded over it. */
+  odometerUncertain: number[];
   /** Reads attempted on this vehicle. After ODOMETER_ATTEMPT_LIMIT the guard
    * is offered the "can't read it" route rather than retrying forever. */
   odometerAttempts: number;
@@ -53,7 +57,7 @@ interface ExitSessionState {
   setPlan: (plan: Trip) => void;
   setDriver: (driver: Driver) => void;
   setDriverMismatch: (driver: Driver) => void;
-  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean) => void;
+  setOdometerCapture: (photo: string, odometerGuess: string, confident: boolean, uncertain?: number[]) => void;
   countOdometerAttempt: () => void;
   setOdometerIssuePhoto: (photo: string) => void;
   setTrip: (trip: Trip) => void;
@@ -70,6 +74,7 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   step: "SPLASH",
   odometerGuess: "",
   odometerConfident: true,
+  odometerUncertain: [],
   odometerAttempts: 0,
 
   setStep: (step) => set({ step }),
@@ -78,8 +83,8 @@ export const useExitSession = create<ExitSessionState>((set) => ({
   setPlan: (plan) => set({ plan, step: "TRIP_FOUND" }),
   setDriver: (driver) => set({ driver, driverCapturedAt: new Date().toISOString(), step: "DRIVER_IDENTIFIED" }),
   setDriverMismatch: (mismatchDriver) => set({ mismatchDriver, step: "DRIVER_MISMATCH_BLOCKED" }),
-  setOdometerCapture: (odometerPhoto, odometerGuess, odometerConfident) =>
-    set({ odometerPhoto, odometerGuess, odometerConfident }),
+  setOdometerCapture: (odometerPhoto, odometerGuess, odometerConfident, odometerUncertain = []) =>
+    set({ odometerPhoto, odometerGuess, odometerConfident, odometerUncertain }),
   countOdometerAttempt: () => set((s) => ({ odometerAttempts: s.odometerAttempts + 1 })),
   setOdometerIssuePhoto: (odometerIssuePhoto) => set({ odometerIssuePhoto }),
   setTrip: (trip) => set({ trip, step: "RECORD_SAVED" }),
@@ -97,6 +102,7 @@ export const useExitSession = create<ExitSessionState>((set) => ({
       odometerPhoto: undefined,
       odometerGuess: "",
       odometerConfident: true,
+  odometerUncertain: [],
       odometerAttempts: 0,
       odometerIssuePhoto: undefined,
       trip: undefined,

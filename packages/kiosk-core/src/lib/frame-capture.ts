@@ -227,3 +227,42 @@ export function toStoredJpeg(canvas: HTMLCanvasElement, maxEdge = 1600, quality 
   ctx.drawImage(canvas, 0, 0, out.width, out.height);
   return out.toDataURL("image/jpeg", quality);
 }
+
+/**
+ * The CSS transform that makes a region of the video fill its container.
+ *
+ * The camera's own zoom magnifies about the sensor centre, so zooming in on an
+ * odometer sitting bottom-right of the cluster pushes it out of frame
+ * entirely. Transforming the preview instead magnifies wherever the digits
+ * actually are. The capture still crops from the full-resolution frame, so
+ * this only changes what the operator sees, never what the reader is given.
+ *
+ * `region` is in the video's own pixels. Returns the `transform` and
+ * `transformOrigin` for the <video>, or null when there is nothing to do.
+ */
+export function regionZoomTransform(
+  video: HTMLVideoElement,
+  region: { x: number; y: number; width: number; height: number },
+  maxScale = 6,
+): { transform: string; transformOrigin: string } | null {
+  const boxW = video.clientWidth;
+  const boxH = video.clientHeight;
+  const { videoWidth: vw, videoHeight: vh } = video;
+  if (!boxW || !boxH || !vw || !vh || region.width < 1 || region.height < 1) return null;
+
+  // object-fit: cover — the same mapping mapOverlayToVideoRect inverts.
+  const cover = Math.max(boxW / vw, boxH / vh);
+  const offsetX = (vw * cover - boxW) / 2;
+  const offsetY = (vh * cover - boxH) / 2;
+
+  // How much further to magnify so the region fills the container, with a
+  // little margin so the digits are not flush against the edges.
+  const scale = Math.min(maxScale, Math.max(1, Math.min(boxW / (region.width * cover), boxH / (region.height * cover)) * 0.85));
+
+  const centreX = (region.x + region.width / 2) * cover - offsetX;
+  const centreY = (region.y + region.height / 2) * cover - offsetY;
+  const tx = boxW / 2 - centreX * scale;
+  const ty = boxH / 2 - centreY * scale;
+
+  return { transform: `translate(${tx}px, ${ty}px) scale(${scale})`, transformOrigin: "0 0" };
+}

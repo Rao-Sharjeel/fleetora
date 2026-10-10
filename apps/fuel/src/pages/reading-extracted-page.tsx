@@ -1,5 +1,5 @@
 import { Gauge } from "lucide-react";
-import { KioskShell, PrimaryButton, SuccessBadge } from "@fleetora/kiosk-core";
+import { KioskShell, OdometerDigits, PrimaryButton, SuccessBadge } from "@fleetora/kiosk-core";
 import { useFuelSession } from "@/state/fuel-session";
 
 /**
@@ -11,12 +11,18 @@ import { useFuelSession } from "@/state/fuel-session";
  * after {ODOMETER_ATTEMPT_LIMIT} failed reads the capture screen offers the
  * report route instead, which puts the number in an administrator's hands.
  *
- * Only a confident read reaches this screen — an unsure one is treated as a
- * failed attempt rather than something to rubber-stamp.
+ * An unsure read now reaches this screen too, with the doubted digits marked
+ * and a differently-worded confirmation. It used to be discarded outright, on
+ * the reasoning that a guard who cannot edit should not rubber-stamp — but
+ * this screen already shows the photo beside the number and asks whether they
+ * match, which is exactly the check a marginal digit needs. Discarding the
+ * whole reading over one glyph bought no safety and cost correct readings.
  */
 export function ReadingExtractedPage() {
   const vehicle = useFuelSession((s) => s.vehicle);
   const odometerGuess = useFuelSession((s) => s.odometerGuess);
+  const odometerConfident = useFuelSession((s) => s.odometerConfident);
+  const odometerUncertain = useFuelSession((s) => s.odometerUncertain);
   const odometerPhoto = useFuelSession((s) => s.odometerPhoto);
   const setStep = useFuelSession((s) => s.setStep);
 
@@ -32,7 +38,7 @@ export function ReadingExtractedPage() {
       footer={
         <>
           <PrimaryButton disabled={!odometerValid} onClick={() => setStep("FUEL_DETAILS")}>
-            Yes, that's correct
+            {odometerConfident ? "Yes, that's correct" : "I've checked it — this is correct"}
           </PrimaryButton>
           <button type="button" className="text-sm text-kiosk-blue" onClick={() => setStep("CAPTURE_ODOMETER")}>
             No — retake the photo
@@ -46,11 +52,15 @@ export function ReadingExtractedPage() {
         <span className="text-xs text-kiosk-muted">Odometer Reading</span>
         <div className="flex items-center gap-2">
           <Gauge className="h-6 w-6 text-kiosk-success" />
-          <span className="text-3xl font-bold tabular-nums text-kiosk-text">
-            {Number(odometerGuess).toLocaleString()}
-          </span>
+          <OdometerDigits reading={odometerGuess} uncertainPositions={odometerUncertain} />
           <span className="text-sm text-kiosk-muted">km</span>
         </div>
+        {!odometerConfident && odometerUncertain.length > 0 && (
+          <span className="text-xs text-kiosk-warning">
+            The marked {odometerUncertain.length === 1 ? "digit was" : "digits were"} hard to read. Check{" "}
+            {odometerUncertain.length === 1 ? "it" : "them"} against the photo before confirming.
+          </span>
+        )}
         {!odometerValid && (
           <span className="text-xs text-kiosk-danger">
             Below the last recorded reading ({vehicle.currentOdometer.toLocaleString()} km) — retake the photo.

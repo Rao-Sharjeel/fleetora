@@ -106,16 +106,26 @@ export function CaptureOdometerPage() {
         return;
       }
 
-      if (!confident) {
-        // Nobody here can correct a reading, so an unsure one is not offered
-        // for approval — that would just be a guard rubber-stamping a number
-        // the reader itself doubts. It counts as a failed attempt instead.
+      // An on-device read that agreed across crop variants but has a digit or
+      // two below the confidence bar. These used to be thrown away whole, which
+      // cost correct readings over a single marginal glyph and sent the guard
+      // back to rephotograph a legible cluster. They now go forward with those
+      // positions marked, for a person who can see the actual odometer to
+      // check. Deliberately on-device only: the server fallback is a far weaker
+      // reader and its unsure answers are not worth putting in front of anyone.
+      const unsureButRead =
+        Boolean(onDevice?.reading) &&
+        !onDevice?.confident &&
+        !onDevice?.belowLastOdometer &&
+        !onDevice?.missingTrailingDigit;
+
+      if (!confident && !unsureButRead) {
         setMessage("Couldn't read the odometer clearly. Try again from a different angle.");
         setBusy(false);
         return;
       }
 
-      setOdometerCapture(dataUrl, reading, true);
+      setOdometerCapture(dataUrl, reading, confident, onDevice?.uncertainPositions ?? []);
       setStep("READING_EXTRACTED");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -127,8 +137,7 @@ export function CaptureOdometerPage() {
     <KioskShell onBack={() => setStep("DRIVER_IDENTIFIED")}>
       <h1 className="text-lg font-semibold">Capture Odometer Reading</h1>
       <p className="text-sm text-kiosk-muted">
-        Fill the frame with the odometer — use the zoom slider, the light if it's dim, and tap the preview to
-        focus.
+        Tap the odometer digits and the camera locks onto them. Use the zoom slider or the light if it helps.
       </p>
       {message && <p className="rounded-lg bg-kiosk-danger/10 p-2 text-center text-sm text-kiosk-danger">{message}</p>}
       {busy ? (
@@ -137,7 +146,7 @@ export function CaptureOdometerPage() {
           Reading odometer…
         </div>
       ) : (
-        <CameraView variant="odometer" hint="Zoom in until the odometer fills the frame" onCapture={handleCapture} />
+        <CameraView variant="odometer" hint="Tap the odometer digits to lock on" onCapture={handleCapture} />
       )}
       {!busy && (blocked || odometerAttempts >= ODOMETER_ATTEMPT_LIMIT) && (
         <button

@@ -192,6 +192,50 @@ function getDetSession(): Promise<ort.InferenceSession> {
   return detSession;
 }
 
+/**
+ * The digit region nearest a point the operator tapped, in source pixels.
+ *
+ * The detector is the weak link in this pipeline — it is what fails on a
+ * glare-washed cluster, and what collapses when the digits already fill the
+ * frame. Letting the operator say "they are here" turns a failure into a
+ * gesture: the person holding the phone can always see the odometer, and only
+ * needs to point at it.
+ *
+ * `x`/`y` are normalised 0-1 in the source's own coordinates. A box containing
+ * the point wins; failing that, the nearest box within a reasonable distance,
+ * so a tap that lands just off the glyphs still works. Null means the detector
+ * found nothing near enough, and the caller should leave the frame alone.
+ */
+export async function findDigitsNear(
+  source: HTMLCanvasElement,
+  x: number,
+  y: number,
+): Promise<TextBox | null> {
+  const det = await getDetSession();
+  const boxes = mergeBoxes([await detectTextBoxes(det, source, source.width, source.height)]);
+  if (!boxes.length) return null;
+
+  const px = x * source.width;
+  const py = y * source.height;
+
+  const containing = boxes.filter((b) => px >= b.x1 && px <= b.x2 && py >= b.y1 && py <= b.y2);
+  // Smallest containing box: on a cluster the digits often sit inside a larger
+  // detected panel, and the tighter one is the line we want.
+  if (containing.length) {
+    return containing.sort((a, b) => (a.x2 - a.x1) * (a.y2 - a.y1) - (b.x2 - b.x1) * (b.y2 - b.y1))[0];
+  }
+
+  const distance = (b: TextBox) => {
+    const dx = Math.max(b.x1 - px, 0, px - b.x2);
+    const dy = Math.max(b.y1 - py, 0, py - b.y2);
+    return Math.hypot(dx, dy);
+  };
+  const nearest = [...boxes].sort((a, b) => distance(a) - distance(b))[0];
+  // A tap more than a sixth of the frame away from anything was not aimed at
+  // that box; treat it as a miss rather than locking onto the wrong text.
+  return distance(nearest) <= Math.min(source.width, source.height) / 6 ? nearest : null;
+}
+
 /** Warms both models so the first capture isn't waiting on a download. */
 export function preloadOdometerModel(): void {
   Promise.all([getRecSession(), getDetSession()]).catch(() => {
