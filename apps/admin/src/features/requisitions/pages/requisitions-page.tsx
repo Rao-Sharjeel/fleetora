@@ -1,83 +1,144 @@
 import { useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Plus } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable } from "@/components/shared/data-table";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { FormField } from "@/components/shared/form-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateRequisition, useRequisitions } from "@/features/requisitions/hooks";
-import { useMasterCollection } from "@/features/master-data/hooks";
+  useDecideRequisition,
+  useDeleteRequisition,
+  useRequisitions,
+} from "@/features/requisitions/hooks";
+import { RequisitionFormDialog } from "@/features/requisitions/components/requisition-form-dialog";
+import { isDecided } from "@/services/requisitions.service";
 import type { Requisition } from "@/types";
 import { formatDateTime } from "@/lib/formatters";
 import { useCan } from "@/hooks/use-session";
 
-const schema = z.object({
-  requestedBy: z.string().min(1, "Required"),
-  department: z.string().min(1, "Required"),
-  purpose: z.string().min(1, "Required"),
-  destination: z.string().min(1, "Required"),
-  requiredDateTime: z.string().min(1, "Required"),
-  expectedReturn: z.string().optional(),
-  approver: z.string().optional(),
-});
-type FormValues = z.infer<typeof schema>;
-
-const columns: ColumnDef<Requisition>[] = [
-  { accessorKey: "requisitionNumber", header: "Requisition #" },
-  { accessorKey: "requestedBy", header: "Requested By" },
-  { accessorKey: "department", header: "Department" },
-  { accessorKey: "purpose", header: "Purpose" },
-  { accessorKey: "destination", header: "Destination" },
-  {
-    accessorKey: "requiredDateTime",
-    header: "Required",
-    cell: ({ getValue }) => formatDateTime(getValue<string>()),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ getValue }) => <StatusBadge status={getValue<Requisition["status"]>() as never} />,
-  },
-];
-
 export function RequisitionsPage() {
   const { data: requisitions = [], isLoading } = useRequisitions();
-  const { data: departments = [] } = useMasterCollection("departmentMasters");
-  const { data: purposes = [] } = useMasterCollection("vehiclePurposes");
-  const createRequisition = useCreateRequisition();
-  const [open, setOpen] = useState(false);
+  const deleteRequisition = useDeleteRequisition();
+  const decide = useDecideRequisition();
   const can = useCan();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Requisition | null>(null);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { requestedBy: "", department: "", purpose: "", destination: "", requiredDateTime: "" },
-  });
+  function openAdd() {
+    setEditing(null);
+    setDialogOpen(true);
+  }
 
-  async function onSubmit(values: FormValues) {
+  function openEdit(requisition: Requisition) {
+    setEditing(requisition);
+    setDialogOpen(true);
+  }
+
+  async function handleDelete(requisition: Requisition) {
+    if (!window.confirm(`Delete ${requisition.requisitionNumber}? This can't be undone.`)) return;
     try {
-      await createRequisition.mutateAsync(values);
-      toast.success("Requisition submitted for approval.");
-      form.reset();
-      setOpen(false);
+      await deleteRequisition.mutateAsync(requisition.id);
+      toast.success("Requisition deleted.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit requisition.");
+      toast.error(err instanceof Error ? err.message : "Failed to delete requisition.");
     }
   }
+
+  async function handleDecide(requisition: Requisition, decision: "approve" | "reject") {
+    const verb = decision === "approve" ? "Approve" : "Reject";
+    if (!window.confirm(`${verb} ${requisition.requisitionNumber}?`)) return;
+    try {
+      await decide.mutateAsync({ id: requisition.id, decision });
+      toast.success(`Requisition ${decision === "approve" ? "approved" : "rejected"}.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Failed to ${decision} requisition.`);
+    }
+  }
+
+  const canDecide = can("requisitions.approve");
+  const canEdit = can("requisitions.edit");
+  const canDelete = can("requisitions.delete");
+
+  const columns: ColumnDef<Requisition>[] = [
+    { accessorKey: "requisitionNumber", header: "Requisition #" },
+    { accessorKey: "requestedBy", header: "Requested By" },
+    { accessorKey: "department", header: "Department" },
+    { accessorKey: "purpose", header: "Purpose" },
+    { accessorKey: "destination", header: "Destination" },
+    {
+      accessorKey: "requiredDateTime",
+      header: "Required",
+      cell: ({ getValue }) => formatDateTime(getValue<string>()),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ getValue }) => <StatusBadge status={getValue<Requisition["status"]>() as never} />,
+    },
+    ...(canDecide || canEdit || canDelete
+      ? [
+          {
+            id: "actions",
+            meta: { skeleton: "action" },
+            header: "",
+            cell: ({ row }) => {
+              const requisition = row.original;
+              // Every action here only applies to a requisition nobody has
+              // acted on yet. The API refuses the rest with a 409; hiding them
+              // is so nobody is offered a button that cannot work.
+              if (isDecided(requisition)) {
+                return <span className="text-xs text-muted-foreground">Decided</span>;
+              }
+              return (
+                <div className="flex items-center gap-1">
+                  {canDecide && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Approve requisition"
+                        onClick={() => handleDecide(requisition, "approve")}
+                      >
+                        <Check className="h-4 w-4 text-success" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Reject requisition"
+                        onClick={() => handleDecide(requisition, "reject")}
+                      >
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                  {canEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Edit requisition"
+                      onClick={() => openEdit(requisition)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Delete requisition"
+                      onClick={() => handleDelete(requisition)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              );
+            },
+          } satisfies ColumnDef<Requisition>,
+        ]
+      : []),
+  ];
 
   return (
     <div className="flex flex-col gap-6">
@@ -86,72 +147,14 @@ export function RequisitionsPage() {
         description="Prior authorization requests for vehicle use, before Gate-Out."
         actions={
           can("requisitions.create") && (
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4" /> New Requisition
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>New Vehicle Requisition</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-                  <FormField label="Requested By" error={form.formState.errors.requestedBy?.message}>
-                    <Input {...form.register("requestedBy")} placeholder="e.g. Accounts" />
-                  </FormField>
-                  <FormField label="Department" error={form.formState.errors.department?.message}>
-                    <Select onValueChange={(v) => form.setValue("department", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((d) => (
-                          <SelectItem key={d.id} value={d.name}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-                  <FormField label="Purpose" error={form.formState.errors.purpose?.message}>
-                    <Select onValueChange={(v) => form.setValue("purpose", v)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select purpose" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {purposes.map((p) => (
-                          <SelectItem key={p.id} value={p.name}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-                  <FormField label="Destination" error={form.formState.errors.destination?.message}>
-                    <Input {...form.register("destination")} placeholder="e.g. Gulberg, Lahore" />
-                  </FormField>
-                  <FormField label="Required Date/Time" error={form.formState.errors.requiredDateTime?.message}>
-                    <Input type="datetime-local" {...form.register("requiredDateTime")} />
-                  </FormField>
-                  <FormField label="Expected Return (optional)">
-                    <Input type="datetime-local" {...form.register("expectedReturn")} />
-                  </FormField>
-                  <FormField label="Approver (optional)">
-                    <Input {...form.register("approver")} placeholder="e.g. Fleet Manager" />
-                  </FormField>
-                  <DialogFooter>
-                    <Button type="submit" loading={createRequisition.isPending} loadingText="Submitting…">
-                      Submit Requisition
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button onClick={openAdd}>
+              <Plus className="h-4 w-4" /> New Requisition
+            </Button>
           )
         }
       />
       <DataTable columns={columns} data={requisitions} searchPlaceholder="Search requisitions…" isLoading={isLoading} />
+      <RequisitionFormDialog open={dialogOpen} onOpenChange={setDialogOpen} requisition={editing} />
     </div>
   );
 }

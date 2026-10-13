@@ -49,7 +49,8 @@ PERMISSION_GROUPS: list[dict] = [
     {"key": "requisitions", "label": "Requisitions", "permissions": [
         ("requisitions.view", "View requisitions"),
         ("requisitions.create", "Create requisitions"),
-        ("requisitions.edit", "Edit requisitions"),
+        ("requisitions.edit", "Edit requisitions awaiting approval"),
+        ("requisitions.delete", "Delete requisitions awaiting approval"),
         ("requisitions.approve", "Approve or reject requisitions"),
     ]},
     {"key": "fuel", "label": "Fuel", "permissions": [
