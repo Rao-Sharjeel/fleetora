@@ -82,6 +82,17 @@ const MAX_DIGITS = 7;
 /** Fraction of crop variants that must agree before a reading is trusted. */
 const MIN_VARIANT_AGREEMENT = 5 / 6;
 
+/**
+ * Floor on how many variants a candidate must have been seen in, independent
+ * of the ratio above. A box that only produced one usable crop satisfies
+ * `agreement / variants >= MIN_VARIANT_AGREEMENT` trivially (1/1 = 100%) without
+ * any actual cross-variant corroboration — on a real photo this is what let a
+ * single contaminated read ("1324219" from one crop that caught a label edge)
+ * through as "fully agreed" once a competing misread was merged away. Two
+ * independent reads agreeing is the minimum that counts as agreement at all.
+ */
+const MIN_AGREEING_VARIANTS = 2;
+
 /** Bar for the digits that *were* read in the mid-roll case. Lower than
  * DIGIT_CONFIRM_BELOW because the operator is confirming the result anyway,
  * and on a real drum the readable digits scored as low as 0.948. */
@@ -497,6 +508,31 @@ async function readBox(
   }
   if (!variants) return [];
 
+  // Merge a spurious edge digit into its one-digit-shorter counterpart.
+  // Padding sometimes drags in a neighbouring label — an "ODO" caption sitting
+  // right above the digit row is enough — and it decodes as one extra digit
+  // at either end: 324219 comes back as 1324219 on some variants and 324219 on
+  // others. Comparing as numbers already collapses a leading-zero version of
+  // the same read, but a non-zero extra digit is a different number and splits
+  // the vote instead, so neither form reaches the agreement bar even though
+  // most variants found the same physical reading. When the shorter form is
+  // *also* independently seen, that is strong evidence the edge digit came
+  // from outside the odometer, so its votes are credited to the shorter read
+  // rather than left to compete against it.
+  for (const [value, entry] of [...counts]) {
+    const text = String(value);
+    if (text.length <= MIN_DIGITS) continue;
+    for (const strippedText of [text.slice(1), text.slice(0, -1)]) {
+      if (strippedText.length < MIN_DIGITS) continue;
+      const target = counts.get(Number(strippedText));
+      if (target) {
+        target.count += entry.count;
+        counts.delete(value);
+        break;
+      }
+    }
+  }
+
   const excluded = new Set(options.excludeValues ?? []);
   const out: BoxCandidate[] = [];
   for (const [value, { digits, count }] of counts) {
@@ -532,6 +568,13 @@ function pickBest(candidates: BoxCandidate[], lastOdometer: number | undefined):
     }
   }
   return best;
+}
+
+/** Whether a candidate's cross-variant agreement is strong enough to trust —
+ * both the ratio and an absolute floor, since a 1-of-1 "agreement" is really
+ * a sample size of one. */
+function hasAgreement(candidate: BoxCandidate): boolean {
+  return candidate.variants >= MIN_AGREEING_VARIANTS && candidate.agreement / candidate.variants >= MIN_VARIANT_AGREEMENT;
 }
 
 function meanConfidence(digits: DigitReading[]): number {
@@ -624,7 +667,7 @@ function asBelowLastOdometer(
     // won had the floor not excluded it.
     .sort((a, b) => b.agreement - a.agreement || meanConfidence(b.digits) - meanConfidence(a.digits));
   const best = below[0];
-  if (!best || best.agreement / best.variants < MIN_VARIANT_AGREEMENT) return null;
+  if (!best || !hasAgreement(best)) return null;
   return {
     reading: String(best.value),
     confidence: meanConfidence(best.digits),
@@ -730,7 +773,7 @@ export async function readOdometerOnDevice(
     seenCandidates.push(...allCandidates);
 
     const best = pickBest(allCandidates, options.lastOdometer);
-    if (best && best.agreement / best.variants >= MIN_VARIANT_AGREEMENT) {
+    if (best && hasAgreement(best)) {
       return toReading(best);
     }
 
