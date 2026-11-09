@@ -64,11 +64,12 @@ export function LoginPage() {
           src="/drive-logo-tagline.png"
           alt="D-RIVE — Dynamic Resource & Intelligent Vehicle Ecosystem"
         />
+        {/* Powered-by lockup — intentionally hidden.
         <p className="fx-powered">
           powered by
           <img className="fx-sigma" src="/sigma-soft-logo.png" alt="" />
           Sigma Soft
-        </p>
+        </p> */}
       </header>
 
       <p className="fx-colophon">© {now.getFullYear()} Fleetora. All rights reserved.</p>

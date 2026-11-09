@@ -32,10 +32,11 @@ export function SplashScreen({ wordmark, onBegin }: SplashScreenProps) {
       </div>
       <div className="flex w-full flex-col items-center gap-3">
         <PrimaryButton onClick={onBegin}>Tap to Begin</PrimaryButton>
+        {/* Powered-by lockup — intentionally hidden.
         <div className="flex items-center gap-2 text-xs text-kiosk-muted">
           <span>Powered by SigmaSoft AI</span>
           <img src="/sigma-soft-logo.png" alt="" className="h-8 w-8 object-contain" />
-        </div>
+        </div> */}
         <BuildStamp />
       </div>
     </div>

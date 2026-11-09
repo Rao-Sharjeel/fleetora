@@ -130,10 +130,11 @@ export function LauncherPage() {
       </div>
 
       <div className="flex flex-col items-center gap-2">
+        {/* Powered-by lockup — intentionally hidden.
         <div className="flex items-center gap-2 text-xs text-kiosk-muted">
           <span>Powered by SigmaSoft AI</span>
           <img src="/sigma-soft-logo.png" alt="" className="h-8 w-8 object-contain" />
-        </div>
+        </div> */}
         <div className="flex items-center gap-3">
           <BuildStamp />
           <UpdateButton />
