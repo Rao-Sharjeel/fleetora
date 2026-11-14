@@ -5,13 +5,24 @@ import {
   captureSharpestCrop,
   captureStillFrame,
   cropVideoToCanvas,
+  focusMetrics,
+  FOCUS_FLOOR,
   mapOverlayToVideoRect,
   regionZoomTransform,
   toStoredJpeg,
+  waitForFocusToSettle,
 } from "../lib/frame-capture";
 import { findDigitsNear } from "../lib/odometer-ocr";
 import { CameraDiagnostics } from "./camera-diagnostics";
-import { focusAt, readCapabilities, setTorch, setZoom, type CameraCapabilities } from "../lib/camera-controls";
+import {
+  focusAt,
+  readCapabilities,
+  restoreContinuousFocus,
+  setTorch,
+  setZoom,
+  type CameraCapabilities,
+  type FocusRequest,
+} from "../lib/camera-controls";
 
 interface CameraViewProps {
   onCapture: (canvas: HTMLCanvasElement, dataUrl: string) => void;
@@ -79,6 +90,11 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [capturing, setCapturing] = useState(false);
+  /** What the capture is doing, so the overlay can say "Focusing" before
+   * "Capturing" — on the gate phones the focus wait is the longer half. */
+  const [captureStage, setCaptureStage] = useState<"focusing" | "capturing">("focusing");
+  /** A capture that came back too blurred to read, held for the override. */
+  const [blurred, setBlurred] = useState<{ canvas: HTMLCanvasElement; settled: boolean } | null>(null);
   const [caps, setCaps] = useState<CameraCapabilities>({ torch: false, zoom: null, tapToFocus: false });
   const [torchOn, setTorchOn] = useState(false);
   const [zoom, setZoomValue] = useState(1);
@@ -95,6 +111,11 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
 
   /** Whether the one automatic restart has been spent on the current stall. */
   const healedRef = useRef(false);
+  /** The pending hand-back to continuous AF from the operator's last tap. */
+  const focusRef = useRef<FocusRequest | null>(null);
+  /** `capturing` readable from a callback that may outlive the render it
+   * started in — a tap's focus request can resolve after the shutter. */
+  const capturingRef = useRef(false);
   const longPressRef = useRef<number | undefined>(undefined);
 
   const restart = useCallback(() => {
@@ -278,6 +299,45 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     });
   }, []);
 
+  /**
+   * The region focus is judged on: the locked digits if the operator has
+   * pointed at them, otherwise the middle of the frame.
+   *
+   * Scoring the whole dashboard would defeat the purpose — a sharp steering
+   * wheel and a blurred cluster average out to "sharp enough", and the
+   * steering wheel is not what anyone is reading.
+   */
+  const focusRect = useCallback(() => {
+    const video = videoRef.current!;
+    if (locked) return locked;
+    const { videoWidth: vw, videoHeight: vh } = video;
+    return { x: vw * 0.2, y: vh * 0.3, width: vw * 0.6, height: vh * 0.4 };
+  }, [locked]);
+
+  /** Crops a full frame down to the locked digits, with the reader's padding. */
+  const cropToLocked = useCallback(
+    (canvas: HTMLCanvasElement): HTMLCanvasElement => {
+      const video = videoRef.current;
+      if (!locked || !video?.videoWidth) return canvas;
+      // A locked region is in preview-frame pixels; a full-resolution still is
+      // larger, so scale before cropping or the crop lands somewhere else.
+      const ratio = canvas.width / video.videoWidth;
+      const padX = locked.width * LOCK_PAD_X;
+      const padY = locked.height * LOCK_PAD_Y;
+      const x = Math.max(0, (locked.x - padX) * ratio);
+      const y = Math.max(0, (locked.y - padY) * ratio);
+      const width = Math.min(canvas.width - x, (locked.width + padX * 2) * ratio);
+      const height = Math.min(canvas.height - y, (locked.height + padY * 2) * ratio);
+      if (width < 16 || height < 8) return canvas;
+      const cropped = document.createElement("canvas");
+      cropped.width = Math.round(width);
+      cropped.height = Math.round(height);
+      cropped.getContext("2d")?.drawImage(canvas, x, y, width, height, 0, 0, cropped.width, cropped.height);
+      return cropped;
+    },
+    [locked],
+  );
+
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
@@ -312,6 +372,7 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     const left = event.clientX - box.left;
     const top = event.clientY - box.top;
     setFocusPoint({ left, top, key: Date.now() });
+    setBlurred(null);
 
     // pointsOfInterest is in frame coordinates, and the preview is drawn with
     // object-fit: cover — so the tap has to be mapped the same way a crop is,
@@ -319,7 +380,16 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
     const point = mapOverlayToVideoRect(video, { left, top, width: 1, height: 1 });
     const videoTrack = track();
     if (videoTrack && caps.tapToFocus) {
-      void focusAt(videoTrack, point.x / video.videoWidth, point.y / video.videoHeight);
+      focusRef.current?.cancelRestore();
+      void focusAt(videoTrack, point.x / video.videoWidth, point.y / video.videoHeight).then((request) => {
+        // applyConstraints can take a few hundred ms on these phones, which is
+        // easily long enough for the operator to tap and then press the
+        // shutter. A capture manages focus itself, so this request's restore
+        // timer would hand the camera back to continuous AF in the middle of
+        // the capture's focus wait — restarting the very hunt it is waiting on.
+        if (capturingRef.current) request.cancelRestore();
+        else focusRef.current = request;
+      });
     }
 
     if (variant !== "odometer" || locking) return;
@@ -354,55 +424,122 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
   }
 
   function clearLock() {
+    setBlurred(null);
     setLocked(null);
     setLockZoom(undefined);
     setLockMissed(false);
   }
 
+  /**
+   * Hands a finished capture to the caller and releases the camera.
+   *
+   * Release happens the moment the frames are in hand. What follows — OCR —
+   * can take seconds, and leaving the stream live keeps the camera indicator
+   * on and the preview moving as though nothing was captured.
+   */
+  function commit(canvas: HTMLCanvasElement) {
+    stopStream();
+    // Full canvas to the OCR, a bounded copy for storage and upload.
+    onCapture(canvas, toStoredJpeg(canvas));
+  }
+
+  /**
+   * The odometer capture: focus first, then take the sharpest frame going.
+   *
+   * The gate phones (Galaxy A07) take well over a second to converge, and the
+   * old path grabbed a still the instant the shutter was pressed — so on that
+   * phone every capture was a frame from the middle of the focus hunt, and the
+   * reader was being blamed for a photo no reader could have read. Three
+   * changes, in order of how much they matter:
+   *
+   * 1. Wait for focus. A single-shot refocus on the digits where the device
+   *    supports it, then sample the preview until the sharpness plateaus.
+   * 2. Judge the still against the burst instead of trusting it. A
+   *    `takePhoto()` has several times the pixels, which is exactly what the
+   *    recogniser is short of — but only while it is in focus, and on a slow
+   *    phone it often isn't when the preview already is.
+   * 3. Refuse mush, out loud. A frame with no resolvable edges used to go to
+   *    the OCR, burn an attempt, and come back "couldn't read it clearly, try
+   *    a different angle" — which blames the angle for a focus problem and
+   *    sends the guard round the vehicle for nothing.
+   */
+  async function captureOdometer(video: HTMLVideoElement, videoTrack: MediaStreamTrack | null) {
+    setCaptureStage("focusing");
+    // The tap's pending hand-back to continuous AF would restart the hunt
+    // halfway through this wait. The explicit restore below replaces it.
+    focusRef.current?.cancelRestore();
+    focusRef.current = null;
+
+    let focusRequest: FocusRequest | null = null;
+    if (videoTrack && caps.tapToFocus) {
+      const rect = focusRect();
+      focusRequest = await focusAt(
+        videoTrack,
+        (rect.x + rect.width / 2) / video.videoWidth,
+        (rect.y + rect.height / 2) / video.videoHeight,
+        // No timer: this capture restores continuous focus itself, once it has
+        // its frames, rather than racing a timeout it cannot see.
+        0,
+      );
+    }
+    const wait = await waitForFocusToSettle(video, focusRect);
+
+    setCaptureStage("capturing");
+    // Both candidates are full frames; crop each to the locked digits before
+    // scoring, or a sharp dashboard outscores a sharp odometer.
+    const candidates: HTMLCanvasElement[] = [];
+    if (videoTrack) {
+      const still = await captureStillFrame(videoTrack);
+      if (still) candidates.push(cropToLocked(still));
+    }
+    const burst = await captureSharpestCrop(video, currentCropRect);
+    if (burst) candidates.push(cropToLocked(burst));
+
+    if (videoTrack && focusRequest?.ok) void restoreContinuousFocus(videoTrack);
+    if (candidates.length === 0) return;
+
+    let best = candidates[0];
+    let bestScore = focusMetrics(best).normalised;
+    for (const candidate of candidates.slice(1)) {
+      const score = focusMetrics(candidate).normalised;
+      // >=, so that on a tie the later candidate — the preview burst, which is
+      // the one guaranteed to be a real frame of the live scene — wins.
+      if (score >= bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+
+    if (bestScore < FOCUS_FLOOR) {
+      // Deliberately not committed: this would cost the operator one of their
+      // few attempts and come back with misleading advice. The stream stays
+      // live so the retry is a single tap, and the frame is kept so an
+      // operator who disagrees can send it anyway.
+      setBlurred({ canvas: best, settled: wait.settled });
+      return;
+    }
+
+    commit(best);
+  }
+
   async function capture() {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0 || capturing) return;
+    capturingRef.current = true;
     setCapturing(true);
+    setBlurred(null);
     try {
       const videoTrack = track();
-      // A full-resolution still first — several times the pixels on the digits,
-      // which is what the recogniser is short of. Only for the odometer: the QR
-      // path reads the live preview and a shutter round-trip would slow it
-      // down for no gain.
-      let canvas: HTMLCanvasElement | null = null;
-      if (variant === "odometer" && videoTrack) {
-        canvas = await captureStillFrame(videoTrack);
+      if (variant === "odometer") {
+        await captureOdometer(video, videoTrack);
+        return;
       }
-      if (!canvas) canvas = await captureSharpestCrop(video, currentCropRect);
-
-      // A locked region is in preview-frame pixels; a full-resolution still is
-      // larger, so scale before cropping or the crop lands somewhere else.
-      if (canvas && locked && video.videoWidth) {
-        const ratio = canvas.width / video.videoWidth;
-        const padX = locked.width * LOCK_PAD_X;
-        const padY = locked.height * LOCK_PAD_Y;
-        const x = Math.max(0, (locked.x - padX) * ratio);
-        const y = Math.max(0, (locked.y - padY) * ratio);
-        const width = Math.min(canvas.width - x, (locked.width + padX * 2) * ratio);
-        const height = Math.min(canvas.height - y, (locked.height + padY * 2) * ratio);
-        if (width >= 16 && height >= 8) {
-          const cropped = document.createElement("canvas");
-          cropped.width = Math.round(width);
-          cropped.height = Math.round(height);
-          cropped
-            .getContext("2d")
-            ?.drawImage(canvas, x, y, width, height, 0, 0, cropped.width, cropped.height);
-          canvas = cropped;
-        }
-      }
-      // Release the camera the moment the frames are in hand. What follows —
-      // OCR — can take seconds, and leaving the stream live keeps the camera
-      // indicator on and the preview moving as though nothing was captured.
-      stopStream();
-      if (!canvas) return;
-      // Full canvas to the OCR, a bounded copy for storage and upload.
-      onCapture(canvas, toStoredJpeg(canvas));
+      // The QR and photo paths read the live preview: a shutter round-trip and
+      // a focus wait would slow them down for no gain.
+      const canvas = await captureSharpestCrop(video, currentCropRect);
+      if (canvas) commit(canvas);
     } finally {
+      capturingRef.current = false;
       setCapturing(false);
     }
   }
@@ -544,6 +681,40 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           </div>
         )}
 
+        {blurred && !capturing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
+            <p className="text-sm text-white">The photo came out too blurred to read.</p>
+            <p className="text-xs text-kiosk-muted">
+              {blurred.settled
+                ? "Move back a little — the digits may be closer than this camera can focus — then hold still and tap the digits again."
+                : "This camera needs a moment to focus. Rest the phone against the door frame, tap the digits, and wait for the ring to settle before capturing."}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setBlurred(null)}
+                className="rounded-xl bg-kiosk-accent px-5 py-2.5 text-sm font-semibold text-white active:scale-95"
+              >
+                Try again
+              </button>
+              {/* An escape hatch, not a recommendation. The blur floor is a
+                  judgement about a photo, and a guard looking at the real
+                  cluster is better placed to make it than this threshold is. */}
+              <button
+                type="button"
+                onClick={() => {
+                  const { canvas } = blurred;
+                  setBlurred(null);
+                  commit(canvas);
+                }}
+                className="rounded-xl border border-kiosk-border px-5 py-2.5 text-sm font-medium text-white active:scale-95"
+              >
+                Use it anyway
+              </button>
+            </div>
+          </div>
+        )}
+
         {stalled && !capturing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 px-6 text-center">
             <p className="text-sm text-white">The camera isn't sending a picture.</p>
@@ -569,7 +740,20 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
           />
         )}
 
-        {capturing && (
+        {capturing && captureStage === "focusing" && (
+          // Deliberately not a dimming overlay: the operator should be able to
+          // watch the picture sharpen, both because it tells them the wait is
+          // doing something and because it shows them when to stop moving.
+          // Saying so matters — someone who thinks the app has hung shifts the
+          // phone, which is the one thing that restarts the focus hunt.
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center">
+            <span className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm text-white">
+              <Loader2 className="h-4 w-4 animate-spin text-kiosk-accent" /> Focusing — hold still
+            </span>
+          </div>
+        )}
+
+        {capturing && captureStage === "capturing" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70">
             <Loader2 className="h-8 w-8 animate-spin text-kiosk-accent" />
             <span className="text-sm text-white">Capturing…</span>
@@ -585,7 +769,7 @@ export function CameraView({ onCapture, variant = "photo", hint, onDetectQr }: C
         type="button"
         onClick={capture}
         aria-label="Capture"
-        disabled={capturing}
+        disabled={capturing || blurred !== null}
         className="mx-auto h-16 w-16 shrink-0 rounded-full border-4 border-kiosk-border bg-white active:scale-95 disabled:opacity-60"
       />
     </div>

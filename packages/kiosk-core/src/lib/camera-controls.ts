@@ -70,21 +70,46 @@ export function setZoom(track: MediaStreamTrack, zoom: number): Promise<boolean>
 }
 
 /**
- * Refocuses on a point, given in normalised 0-1 coordinates of the *video
- * frame* (not the element — the caller maps for object-fit: cover first).
+ * Asks the camera to refocus on a point, given in normalised 0-1 coordinates
+ * of the *video frame* (not the element — the caller maps for object-fit:
+ * cover first).
  *
- * Asks for the point and a single-shot refocus together, then restores
- * continuous autofocus a moment later: leaving the camera in single-shot means
- * the next vehicle, at a different distance, stays stuck on the old plane.
+ * Returns a handle rather than a bare boolean because of what the restore
+ * timer does to a capture. Single-shot focus has to be handed back to
+ * continuous afterwards — leaving the camera in single-shot means the next
+ * vehicle, at a different distance, stays stuck on the old plane — but if that
+ * restore lands while a capture is waiting for focus, the camera starts
+ * hunting again from scratch and the frame it waited for is gone. The capture
+ * path cancels the timer for exactly that window.
+ *
+ * `restoreAfterMs: 0` skips the timer entirely, for a caller that will restore
+ * continuous focus itself once it has its frames.
  */
-export async function focusAt(track: MediaStreamTrack, x: number, y: number): Promise<boolean> {
+export interface FocusRequest {
+  /** Whether the device accepted the refocus at all. */
+  ok: boolean;
+  /** Cancels the pending hand-back to continuous autofocus. */
+  cancelRestore: () => void;
+}
+
+export async function focusAt(
+  track: MediaStreamTrack,
+  x: number,
+  y: number,
+  restoreAfterMs = 2500,
+): Promise<FocusRequest> {
   const ok = await apply(track, {
     pointsOfInterest: [{ x, y }],
     focusMode: "single-shot",
   });
-  if (!ok) return false;
-  window.setTimeout(() => {
-    void apply(track, { focusMode: "continuous" });
-  }, 2500);
-  return true;
+  if (!ok || restoreAfterMs <= 0) return { ok, cancelRestore: () => {} };
+  const timer = window.setTimeout(() => {
+    void restoreContinuousFocus(track);
+  }, restoreAfterMs);
+  return { ok, cancelRestore: () => window.clearTimeout(timer) };
+}
+
+/** Hands the camera back to continuous autofocus. */
+export function restoreContinuousFocus(track: MediaStreamTrack): Promise<boolean> {
+  return apply(track, { focusMode: "continuous" });
 }

@@ -9,6 +9,12 @@
  * 2. A single frame grabbed on tap is a lottery: autofocus may still be
  *    hunting, or the operator's tap may shake the tablet. The QR path already
  *    samples the live feed continuously for exactly this reason.
+ * 3. On a budget phone (the Galaxy A07 the gates actually use) autofocus takes
+ *    well over a second to converge, and a burst fired on the tap returns six
+ *    uniformly blurred frames. Picking the sharpest of six blurs still yields a
+ *    blur, so the capture now *waits* for focus to converge — see
+ *    `waitForFocusToSettle` — and measures whether what it got is readable at
+ *    all rather than handing mush to the recogniser.
  */
 
 /** How many frames to sample before picking the sharpest. */
@@ -84,17 +90,49 @@ export function cropVideoToCanvas(
 }
 
 /**
- * Scores how sharp an image is, as the variance of its luminance gradient.
+ * A crop drawn straight into a small canvas, for the focus sampler.
  *
- * A blurred photo has gentle transitions between neighbouring pixels, so the
- * gradient stays small and its variance is low; a crisp one has hard edges at
- * every digit boundary, which spreads the gradient out. Comparing this across
- * the burst picks the frame that landed in focus. The absolute number is
- * meaningless — it's only ever compared between frames of the same scene.
+ * The settle loop below runs every ~110ms on a phone whose CPU is the reason
+ * this code exists, and a full-resolution crop per sample would make the wait
+ * it is trying to shorten worse. Sharpness ranking survives the downscale, so
+ * sampling works at preview-thumbnail size.
  */
-export function sharpnessScore(canvas: HTMLCanvasElement): number {
+export function cropVideoToSmallCanvas(
+  video: HTMLVideoElement,
+  rect: { x: number; y: number; width: number; height: number },
+  maxWidth = 320,
+): HTMLCanvasElement {
+  const scale = Math.min(1, maxWidth / Math.max(1, rect.width));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(rect.width * scale));
+  canvas.height = Math.max(1, Math.round(rect.height * scale));
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return 0;
+  ctx?.drawImage(video, rect.x, rect.y, rect.width, rect.height, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * Raw and contrast-normalised sharpness for one image.
+ *
+ * Both come from the variance of the luminance Laplacian: a blurred photo has
+ * gentle transitions between neighbouring pixels, so the gradient stays small
+ * and its variance is low, while a crisp one has hard edges at every digit
+ * boundary, which spreads the gradient out.
+ *
+ * `laplacian` is that variance as-is. It is only ever meaningful *between
+ * frames of the same scene* — it scales with how much contrast the scene has,
+ * so a sharp photo of a dim cluster can score below a blurred photo of a
+ * sunlit one. That is all a burst needs, since every frame is the same scene.
+ *
+ * `normalised` divides it by the luminance variance, which cancels that
+ * scaling almost exactly: on synthetic digit bands, dropping the contrast to
+ * 35% moved `laplacian` by 8x and `normalised` not at all (0.9801 both times).
+ * That makes it comparable across scenes and devices, which is what an
+ * absolute "is this readable" judgement needs — see `FOCUS_FLOOR`.
+ */
+export function focusMetrics(canvas: HTMLCanvasElement): { laplacian: number; normalised: number } {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx || canvas.width < 3 || canvas.height < 3) return { laplacian: 0, normalised: 0 };
 
   // Score a downscaled copy: sharpness ranking is preserved, and this keeps a
   // 6-frame burst from stalling the tablet on full-resolution pixel loops.
@@ -104,15 +142,21 @@ export function sharpnessScore(canvas: HTMLCanvasElement): number {
   scratch.width = w;
   scratch.height = h;
   const sctx = scratch.getContext("2d", { willReadFrequently: true });
-  if (!sctx) return 0;
+  if (!sctx) return { laplacian: 0, normalised: 0 };
   sctx.drawImage(canvas, 0, 0, w, h);
 
   const { data } = sctx.getImageData(0, 0, w, h);
   const gray = new Float32Array(w * h);
+  let graySum = 0;
+  let graySumSq = 0;
   for (let i = 0; i < gray.length; i++) {
     const p = i * 4;
-    gray[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+    const v = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+    gray[i] = v;
+    graySum += v;
+    graySumSq += v * v;
   }
+  const grayVar = graySumSq / gray.length - (graySum / gray.length) ** 2;
 
   let sum = 0;
   let sumSq = 0;
@@ -127,9 +171,119 @@ export function sharpnessScore(canvas: HTMLCanvasElement): number {
       count++;
     }
   }
-  if (count === 0) return 0;
+  if (count === 0) return { laplacian: 0, normalised: 0 };
   const mean = sum / count;
-  return sumSq / count - mean * mean;
+  const laplacian = sumSq / count - mean * mean;
+  // A flat grey frame has no contrast to normalise against; calling that
+  // "sharp" because the divisor is tiny is exactly backwards.
+  return { laplacian, normalised: grayVar < 1 ? 0 : laplacian / grayVar };
+}
+
+/** Sharpness for ranking frames of one scene against each other. */
+export function sharpnessScore(canvas: HTMLCanvasElement): number {
+  return focusMetrics(canvas).laplacian;
+}
+
+/**
+ * Below this normalised score, there are no resolvable edges left in the crop
+ * and the recogniser has nothing to work with.
+ *
+ * Set deliberately low. On synthetic digit bands this is around 12 passes of a
+ * 3x3 box blur — thoroughly unreadable — while a focused band scores 0.1 to
+ * 1.0, two orders of magnitude clear of it. Sensor noise on a cheap phone adds
+ * high-frequency detail and so pushes real frames *up*, which makes a low
+ * floor the safe direction to be wrong in: it catches the frames that cannot
+ * possibly read and waves through anything arguable. The operator can override
+ * it regardless, so a miscalibration costs a tap, never the capture.
+ */
+export const FOCUS_FLOOR = 0.01;
+
+/** How long to let autofocus converge before giving up on it (ms). */
+export const FOCUS_SETTLE_TIMEOUT_MS = 2600;
+
+/** Gap between focus samples while waiting (ms). */
+export const FOCUS_SAMPLE_INTERVAL_MS = 110;
+
+/** Consecutive non-improving samples that count as "focus has stopped moving". */
+const FOCUS_PLATEAU_SAMPLES = 3;
+
+/** How much better a sample must be to count as focus still improving. */
+const FOCUS_IMPROVEMENT_RATIO = 1.1;
+
+/**
+ * Whether a series of focus samples has stopped improving.
+ *
+ * Autofocus climbs: each sample is sharper than the last until the lens
+ * reaches the right plane, then the score flattens (and often dips slightly as
+ * the hunt overshoots and corrects). Waiting for that flattening is what makes
+ * the capture track the lens rather than race it. The 10% band keeps sensor
+ * noise and the operator's hand from reading as improvement forever.
+ *
+ * Pure, and separate from the sampling loop, so the policy can be exercised
+ * without a camera.
+ */
+export function focusHasSettled(
+  scores: number[],
+  plateau = FOCUS_PLATEAU_SAMPLES,
+  improvement = FOCUS_IMPROVEMENT_RATIO,
+): boolean {
+  if (scores.length < plateau + 1) return false;
+  const recent = scores.slice(-plateau);
+  const bestBefore = Math.max(...scores.slice(0, -plateau));
+  // A scene with no detail at all never "improves", and would otherwise be
+  // declared settled on the strength of three equally blank samples.
+  if (bestBefore <= 0) return false;
+  return !recent.some((score) => score > bestBefore * improvement);
+}
+
+export interface FocusWait {
+  /** Whether focus actually plateaued, rather than the deadline arriving. */
+  settled: boolean;
+  /** Best normalised score seen while waiting. */
+  best: number;
+  /** Every sample, oldest first — the capture logs these on a failed read. */
+  scores: number[];
+}
+
+/**
+ * Waits for the camera to bring `getRect` into focus.
+ *
+ * This is the fix for the gate phones: `takePhoto()` and a preview burst both
+ * return whatever the sensor has *now*, and on a slow-focusing phone that is a
+ * frame from the middle of the hunt. Sampling the live preview until the
+ * sharpness stops climbing costs under a second on a phone that focuses
+ * quickly and buys a readable frame on one that doesn't.
+ *
+ * Works whether or not the device exposes any focus control: with
+ * `single-shot` the caller triggers a refocus first and this watches it land;
+ * with nothing at all, continuous autofocus is converging anyway and this
+ * waits for the same plateau.
+ */
+export async function waitForFocusToSettle(
+  video: HTMLVideoElement,
+  getRect: () => { x: number; y: number; width: number; height: number },
+  options: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    /** Checked between samples, so a cancelled capture stops sampling. */
+    isCancelled?: () => boolean;
+  } = {},
+): Promise<FocusWait> {
+  const timeoutMs = options.timeoutMs ?? FOCUS_SETTLE_TIMEOUT_MS;
+  const intervalMs = options.intervalMs ?? FOCUS_SAMPLE_INTERVAL_MS;
+  const deadline = Date.now() + timeoutMs;
+  const scores: number[] = [];
+
+  while (Date.now() < deadline) {
+    if (options.isCancelled?.() || video.videoWidth === 0) break;
+    scores.push(focusMetrics(cropVideoToSmallCanvas(video, getRect())).normalised);
+    if (focusHasSettled(scores)) {
+      return { settled: true, best: Math.max(...scores), scores };
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  return { settled: false, best: scores.length ? Math.max(...scores) : 0, scores };
 }
 
 /**
